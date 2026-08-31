@@ -26,6 +26,11 @@ With Mignon, any developer, business, or website creator can:
 
 ## 🏗️ System Architecture
 
+![Mignon Architecture Diagram](docs/architecture_diagram.jpg)
+
+<details>
+<summary><b>Click to view Mermaid Architecture Flowchart</b></summary>
+
 ```mermaid
 graph TD
     subgraph Clients
@@ -67,6 +72,7 @@ graph TD
     AgentEngine -->|JSON + Dynamic UI Cards| Widget
     AgentEngine -->|JSON Payload| DevUser
 ```
+</details>
 
 ---
 
