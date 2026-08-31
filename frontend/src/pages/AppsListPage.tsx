@@ -320,7 +320,7 @@ export const AppsListPage: React.FC = () => {
               <textarea
                 value={aiPrompt}
                 onChange={(e) => setAiPrompt(e.target.value)}
-                placeholder="e.g. Un cotizador de envíos internacionales que pida país de origen, destino y peso en kg, calcule tarifas estimadas y recomiende opciones express."
+                placeholder="e.g. International shipping cost estimator asking for origin, destination, and package weight in kg, providing instant rate breakdowns and express recommendations."
                 rows={4}
                 required
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3.5 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-sky-500"
@@ -330,14 +330,14 @@ export const AppsListPage: React.FC = () => {
                 <span className="text-[11px] text-slate-400">Try presets:</span>
                 <button
                   type="button"
-                  onClick={() => setAiPrompt("Calculadora inteligente de presupuestos para proyectos de desarrollo de software con desglose de horas y stack tecnológico")}
+                  onClick={() => setAiPrompt("Smart budget estimation calculator for software development projects with tech stack and hourly breakdown")}
                   className="text-[11px] text-sky-400 bg-sky-950/60 px-2 py-1 rounded border border-sky-800/40 hover:bg-sky-900/60"
                 >
                   Software Quote
                 </button>
                 <button
                   type="button"
-                  onClick={() => setAiPrompt("Asistente de reserva y cotización de paquetes turísticos con hotel y actividades")}
+                  onClick={() => setAiPrompt("Vacation package booking and itinerary planning assistant with hotel options and local activities")}
                   className="text-[11px] text-indigo-400 bg-indigo-950/60 px-2 py-1 rounded border border-indigo-800/40 hover:bg-indigo-900/60"
                 >
                   Travel Planner

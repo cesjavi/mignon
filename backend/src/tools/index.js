@@ -198,6 +198,76 @@ export async function executeTool(name, args) {
       };
     }
 
+    case "currency_converter": {
+      const amount = Number(args.amount) || 1000;
+      const fromCurr = (args.from_currency || "USD").toUpperCase().trim();
+      const toCurr = (args.to_currency || "EUR").toUpperCase().trim();
+
+      const RATES_TO_USD = {
+        USD: 1.0,
+        EUR: 1.08,
+        GBP: 1.28,
+        JPY: 0.0068,
+        CAD: 0.74,
+        AUD: 0.66,
+        CHF: 1.13,
+        BRL: 0.18,
+        ARS: 0.0011,
+        MXN: 0.054
+      };
+
+      const fromRateUsd = RATES_TO_USD[fromCurr] || 1.0;
+      const toRateUsd = RATES_TO_USD[toCurr] || (toCurr === "EUR" ? 1.08 : 1.0);
+      
+      const rate = fromRateUsd / toRateUsd;
+      const convertedAmount = Number((amount * rate).toFixed(2));
+      const inverseRate = Number((1 / rate).toFixed(4));
+
+      return {
+        status: "success",
+        conversion: {
+          original_amount: amount,
+          from_currency: fromCurr,
+          target_currency: toCurr,
+          converted_amount: convertedAmount,
+          exchange_rate: Number(rate.toFixed(4)),
+          inverse_rate: inverseRate,
+          last_updated: new Date().toISOString(),
+          trend_24h: "+0.14% (Stable)",
+          market_status: "Open"
+        }
+      };
+    }
+
+    case "lead_qualifier": {
+      const company = args.company_name || "Prospective Client";
+      const industry = args.industry || "Technology / SaaS";
+      const budget = args.budget_range || "$10k-$50k";
+      const useCase = args.use_case || "Automated Customer Operations Agents";
+
+      const isHighBudget = budget.includes("$50k") || budget.includes("$100k");
+      const isMidBudget = budget.includes("$10k");
+      
+      const score = isHighBudget ? 94 : isMidBudget ? 82 : 68;
+      const tier = isHighBudget ? "Tier 1 - Enterprise Priority" : isMidBudget ? "Tier 2 - Growth Account" : "Tier 3 - Self-Serve Qualified";
+      const priority = isHighBudget ? "High (Direct Exec Demo)" : isMidBudget ? "Medium (Solutions Engineer Sync)" : "Standard";
+
+      return {
+        status: "success",
+        lead_evaluation: {
+          company_name: company,
+          industry,
+          qualification_score: score,
+          qualification_tier: tier,
+          priority_level: priority,
+          budget_range: budget,
+          identified_use_case: useCase,
+          recommended_agent_package: isHighBudget ? "Enterprise Fleet Cluster (Multi-Agent + SLA)" : "Growth Pod (3-Agent Suite)",
+          suggested_next_action: isHighBudget ? "Schedule 30-min Solutions Architecture Workshop" : "Send interactive sandbox invite and onboarding guide"
+        }
+      };
+    }
+
     default:
       return { status: "success", tool: name, output: "Executed successfully." };
   }

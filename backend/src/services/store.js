@@ -228,9 +228,52 @@ class Store {
     this.apiKeys = new Map();
     this.executionLogs = [];
     this.sessionMemory = new Map(); // sessionId -> array of conversation turns
+    this.rateLimitStore = new Map(); // clientKey -> { lastRequestTime, requestCount, firstRequestTime }
+    this.apiKeyUsageStore = new Map(); // keyId_date -> { count, resetTime }
     
     // Seed initial demo API Key
     this.createApiKey("Production Default Key");
+
+    // Seed realistic baseline execution telemetry
+    this.seedSampleTelemetry();
+  }
+
+  seedSampleTelemetry() {
+    const appsList = Array.from(this.apps.values());
+    if (appsList.length === 0) return;
+
+    const callers = ["widget", "widget", "api", "api", "studio"];
+    const now = Date.now();
+
+    // Generate ~45 realistic historical runs across the last 36 hours
+    for (let i = 45; i >= 1; i--) {
+      const app = appsList[Math.floor(Math.random() * appsList.length)];
+      const callerType = callers[Math.floor(Math.random() * callers.length)];
+      const isError = Math.random() < 0.04; // 4% error rate
+      const latencyMs = isError ? 0 : Math.floor(280 + Math.random() * 850);
+      const tokensTotal = isError ? 0 : Math.floor(190 + Math.random() * 680);
+      const toolExecuted = app.tools && app.tools.length > 0 && !isError
+        ? app.tools[Math.floor(Math.random() * app.tools.length)]
+        : null;
+
+      // Distribute back in time from 36 hours ago to now
+      const timeOffsetMs = (i * 48 * 60 * 1000) + Math.floor(Math.random() * 10 * 60 * 1000);
+      const timestamp = new Date(now - timeOffsetMs).toISOString();
+
+      this.executionLogs.push({
+        id: `run_${Date.now() - timeOffsetMs}_${Math.random().toString(36).substring(2, 6)}`,
+        timestamp,
+        appId: app.id,
+        appName: app.name,
+        callerType,
+        latencyMs,
+        tokensTotal,
+        toolExecuted,
+        status: isError ? "error" : "success",
+        queryPreview: app.sampleQuery ? app.sampleQuery.substring(0, 75) : `Execution for ${app.name}`,
+        error: isError ? "Upstream network timeout from external provider" : undefined
+      });
+    }
   }
 
   // Mini-Apps
@@ -257,6 +300,9 @@ class Store {
       theme: data.theme || { primaryColor: "#38bdf8", mode: "dark", badge: "AI Mini-App", widgetLayout: "card" },
       sampleQuery: data.sampleQuery || "",
       webhookUrl: data.webhookUrl || "",
+      cooldownSeconds: data.cooldownSeconds !== undefined ? Number(data.cooldownSeconds) : 3,
+      maxRequestsPerSession: data.maxRequestsPerSession !== undefined ? Number(data.maxRequestsPerSession) : 10,
+      quotaExceededMessage: data.quotaExceededMessage || "You have reached the free query limit for this session. Please check back later or contact the administrator.",
       createdAt: data.createdAt || new Date().toISOString()
     };
     this.apps.set(id, newApp);
@@ -266,13 +312,127 @@ class Store {
   updateApp(id, updates) {
     const existing = this.apps.get(id);
     if (!existing) return null;
-    const updated = { ...existing, ...updates, updatedAt: new Date().toISOString() };
+    const updated = { 
+      ...existing, 
+      ...updates, 
+      cooldownSeconds: updates.cooldownSeconds !== undefined ? Number(updates.cooldownSeconds) : existing.cooldownSeconds ?? 3,
+      maxRequestsPerSession: updates.maxRequestsPerSession !== undefined ? Number(updates.maxRequestsPerSession) : existing.maxRequestsPerSession ?? 10,
+      quotaExceededMessage: updates.quotaExceededMessage !== undefined ? updates.quotaExceededMessage : existing.quotaExceededMessage,
+      updatedAt: new Date().toISOString() 
+    };
     this.apps.set(id, updated);
     return updated;
   }
 
   deleteApp(id) {
     return this.apps.delete(id);
+  }
+
+  // Rate Limiting, Cooldown & Quota Checking
+  checkRateLimit({ app, clientKey, callerInfo }) {
+    const now = Date.now();
+
+    // If API Key caller, track per-day usage (configurable daily quota)
+    if (callerInfo.type === "api") {
+      const keyId = callerInfo.keyId || "default";
+      const keyRecord = callerInfo.keyId ? this.apiKeys.get(callerInfo.keyId) : null;
+      const limit = keyRecord && keyRecord.dailyQuota !== undefined ? Number(keyRecord.dailyQuota) : 500;
+      const currentDay = new Date().toISOString().slice(0, 10);
+      const usageKey = `${keyId}_${currentDay}`;
+      const record = this.apiKeyUsageStore.get(usageKey) || { 
+        count: 0, 
+        resetTime: new Date(new Date().setHours(24, 0, 0, 0)).getTime() 
+      };
+
+      if (limit > 0 && record.count >= limit) {
+        return {
+          allowed: false,
+          code: "API_QUOTA_EXCEEDED",
+          error: `API Key daily quota of ${limit} requests exceeded. Resets at midnight UTC.`,
+          headers: {
+            "X-RateLimit-Limit": String(limit),
+            "X-RateLimit-Remaining": "0",
+            "X-RateLimit-Reset": String(Math.max(1, Math.ceil((record.resetTime - now) / 1000))),
+            "X-RateLimit-Cooldown": "0"
+          }
+        };
+      }
+
+      record.count++;
+      this.apiKeyUsageStore.set(usageKey, record);
+
+      return {
+        allowed: true,
+        headers: {
+          "X-RateLimit-Limit": limit > 0 ? String(limit) : "unlimited",
+          "X-RateLimit-Remaining": limit > 0 ? String(Math.max(0, limit - record.count)) : "9999",
+          "X-RateLimit-Reset": String(Math.max(1, Math.ceil((record.resetTime - now) / 1000))),
+          "X-RateLimit-Cooldown": "0"
+        }
+      };
+    }
+
+    // Widget / Studio session & IP rate limiting
+    const cooldownSec = app.cooldownSeconds !== undefined ? Number(app.cooldownSeconds) : 3;
+    const maxRequests = app.maxRequestsPerSession !== undefined ? Number(app.maxRequestsPerSession) : 10;
+    const quotaMsg = app.quotaExceededMessage || "You have reached the free query limit for this session. Please check back later or contact the administrator.";
+
+    const sessionData = this.rateLimitStore.get(clientKey) || {
+      lastRequestTime: 0,
+      requestCount: 0,
+      firstRequestTime: now
+    };
+
+    // 1. Check burst cooldown (Anti-spam)
+    if (cooldownSec > 0 && sessionData.lastRequestTime > 0) {
+      const elapsedMs = now - sessionData.lastRequestTime;
+      const cooldownMs = cooldownSec * 1000;
+      if (elapsedMs < cooldownMs) {
+        const remainingSeconds = Math.ceil((cooldownMs - elapsedMs) / 1000);
+        return {
+          allowed: false,
+          code: "COOLDOWN_ACTIVE",
+          error: `Please wait ${remainingSeconds} second${remainingSeconds === 1 ? '' : 's'} before submitting another request.`,
+          cooldownRemaining: remainingSeconds,
+          headers: {
+            "X-RateLimit-Limit": maxRequests > 0 ? String(maxRequests) : "unlimited",
+            "X-RateLimit-Remaining": maxRequests > 0 ? String(Math.max(0, maxRequests - sessionData.requestCount)) : "999",
+            "X-RateLimit-Reset": "3600",
+            "X-RateLimit-Cooldown": String(remainingSeconds)
+          }
+        };
+      }
+    }
+
+    // 2. Check session quota limit (if maxRequests > 0)
+    if (maxRequests > 0 && sessionData.requestCount >= maxRequests) {
+      return {
+        allowed: false,
+        code: "QUOTA_EXCEEDED",
+        error: quotaMsg,
+        headers: {
+          "X-RateLimit-Limit": String(maxRequests),
+          "X-RateLimit-Remaining": "0",
+          "X-RateLimit-Reset": "3600",
+          "X-RateLimit-Cooldown": "0"
+        }
+      };
+    }
+
+    // Passed: update tracking
+    sessionData.requestCount++;
+    sessionData.lastRequestTime = now;
+    this.rateLimitStore.set(clientKey, sessionData);
+
+    return {
+      allowed: true,
+      headers: {
+        "X-RateLimit-Limit": maxRequests > 0 ? String(maxRequests) : "unlimited",
+        "X-RateLimit-Remaining": maxRequests > 0 ? String(Math.max(0, maxRequests - sessionData.requestCount)) : "999",
+        "X-RateLimit-Reset": "3600",
+        "X-RateLimit-Cooldown": String(cooldownSec)
+      }
+    };
   }
 
   // Session Memory Bank
@@ -302,7 +462,7 @@ class Store {
     return crypto.createHash("sha256").update(rawKey).digest("hex");
   }
 
-  createApiKey(name = "Default API Key") {
+  createApiKey(name = "Default API Key", dailyQuota = 500) {
     const id = `key_${Date.now()}`;
     const rawSecret = `mgn_live_${crypto.randomBytes(18).toString("hex")}`;
     const keyHash = this.hashKey(rawSecret);
@@ -311,6 +471,7 @@ class Store {
     const record = {
       id,
       name,
+      dailyQuota: Number(dailyQuota) || 500,
       keyHash,
       prefix,
       createdAt: new Date().toISOString(),
@@ -326,10 +487,23 @@ class Store {
     };
   }
 
+  updateApiKey(id, updates = {}) {
+    const existing = this.apiKeys.get(id);
+    if (!existing) return null;
+    const updated = {
+      ...existing,
+      name: updates.name !== undefined ? updates.name : existing.name,
+      dailyQuota: updates.dailyQuota !== undefined ? Number(updates.dailyQuota) : existing.dailyQuota
+    };
+    this.apiKeys.set(id, updated);
+    return updated;
+  }
+
   listApiKeys() {
     return Array.from(this.apiKeys.values()).map(k => ({
       id: k.id,
       name: k.name,
+      dailyQuota: k.dailyQuota ?? 500,
       prefix: k.prefix,
       createdAt: k.createdAt,
       lastUsedAt: k.lastUsedAt,
@@ -373,28 +547,237 @@ class Store {
     return entry;
   }
 
+  simulateTraffic(count = 5) {
+    const appsList = Array.from(this.apps.values());
+    if (appsList.length === 0) return [];
+
+    const callers = ["widget", "widget", "api", "api", "studio"];
+    const generated = [];
+
+    for (let i = 0; i < count; i++) {
+      const app = appsList[Math.floor(Math.random() * appsList.length)];
+      const callerType = callers[Math.floor(Math.random() * callers.length)];
+      const isError = Math.random() < 0.05;
+      const latencyMs = isError ? 0 : Math.floor(250 + Math.random() * 950);
+      const tokensTotal = isError ? 0 : Math.floor(210 + Math.random() * 700);
+      const toolExecuted = app.tools && app.tools.length > 0 && !isError
+        ? app.tools[Math.floor(Math.random() * app.tools.length)]
+        : null;
+
+      const log = this.logExecution({
+        appId: app.id,
+        appName: app.name,
+        callerType,
+        latencyMs,
+        tokensTotal,
+        toolExecuted,
+        status: isError ? "error" : "success",
+        queryPreview: app.sampleQuery ? app.sampleQuery.substring(0, 75) : `Simulated trigger for ${app.name}`,
+        error: isError ? "Rate limit reached from client source" : undefined
+      });
+      generated.push(log);
+    }
+    return generated;
+  }
+
+  clearLogs() {
+    this.executionLogs = [];
+    return true;
+  }
+
   getAnalytics() {
     const totalRuns = this.executionLogs.length;
     const successfulRuns = this.executionLogs.filter(l => l.status === "success").length;
-    const avgLatency = totalRuns > 0 
-      ? Math.round(this.executionLogs.reduce((acc, l) => acc + (l.latencyMs || 0), 0) / totalRuns)
-      : 0;
-    const totalTokens = this.executionLogs.reduce((acc, l) => acc + (l.tokensTotal || 0), 0);
+    const errorRuns = totalRuns - successfulRuns;
+    
+    // Latency calculations
+    const validLatencies = this.executionLogs
+      .filter(l => l.status === "success" && l.latencyMs > 0)
+      .map(l => l.latencyMs)
+      .sort((a, b) => a - b);
 
-    const appUsage = {};
+    const avgLatency = validLatencies.length > 0 
+      ? Math.round(validLatencies.reduce((acc, l) => acc + l, 0) / validLatencies.length)
+      : 0;
+
+    const p95Index = Math.floor(validLatencies.length * 0.95);
+    const p95LatencyMs = validLatencies.length > 0 ? validLatencies[Math.min(p95Index, validLatencies.length - 1)] : 0;
+    const minLatencyMs = validLatencies.length > 0 ? validLatencies[0] : 0;
+    const maxLatencyMs = validLatencies.length > 0 ? validLatencies[validLatencies.length - 1] : 0;
+
+    const totalTokens = this.executionLogs.reduce((acc, l) => acc + (l.tokensTotal || 0), 0);
+    const avgTokensPerRun = totalRuns > 0 ? Math.round(totalTokens / totalRuns) : 0;
+
+    // Channel breakdown
+    const channelCounts = { widget: 0, api: 0, studio: 0 };
     for (const log of this.executionLogs) {
-      appUsage[log.appName] = (appUsage[log.appName] || 0) + 1;
+      const channel = log.callerType || "widget";
+      channelCounts[channel] = (channelCounts[channel] || 0) + 1;
     }
+    const channelBreakdown = {
+      widget: {
+        count: channelCounts.widget,
+        percent: totalRuns > 0 ? Math.round((channelCounts.widget / totalRuns) * 100) : 0
+      },
+      api: {
+        count: channelCounts.api,
+        percent: totalRuns > 0 ? Math.round((channelCounts.api / totalRuns) * 100) : 0
+      },
+      studio: {
+        count: channelCounts.studio,
+        percent: totalRuns > 0 ? Math.round((channelCounts.studio / totalRuns) * 100) : 0
+      }
+    };
+
+    // Tool breakdown
+    const toolCounts = {};
+    let directReasoningCount = 0;
+    for (const log of this.executionLogs) {
+      if (log.toolExecuted) {
+        toolCounts[log.toolExecuted] = (toolCounts[log.toolExecuted] || 0) + 1;
+      } else {
+        directReasoningCount++;
+      }
+    }
+    const toolBreakdown = [
+      ...Object.entries(toolCounts).map(([tool, count]) => ({
+        tool,
+        count,
+        percent: totalRuns > 0 ? Math.round((count / totalRuns) * 100) : 0
+      })),
+      {
+        tool: "direct_reasoning",
+        count: directReasoningCount,
+        percent: totalRuns > 0 ? Math.round((directReasoningCount / totalRuns) * 100) : 0
+      }
+    ].sort((a, b) => b.count - a.count);
+
+    // Latency distribution buckets
+    const latencyDistribution = {
+      under500ms: 0,
+      between500and1000ms: 0,
+      between1000and2000ms: 0,
+      over2000ms: 0
+    };
+    for (const lat of validLatencies) {
+      if (lat < 500) latencyDistribution.under500ms++;
+      else if (lat <= 1000) latencyDistribution.between500and1000ms++;
+      else if (lat <= 2000) latencyDistribution.between1000and2000ms++;
+      else latencyDistribution.over2000ms++;
+    }
+
+    // Per-app detailed breakdown
+    const appMap = {};
+    for (const log of this.executionLogs) {
+      const key = log.appId || log.appName;
+      if (!appMap[key]) {
+        const appObj = this.apps.get(log.appId);
+        appMap[key] = {
+          id: log.appId,
+          name: log.appName,
+          category: appObj ? appObj.category : "General",
+          icon: appObj ? appObj.icon : "Sparkles",
+          runs: 0,
+          successCount: 0,
+          errorCount: 0,
+          latencies: [],
+          tokens: 0,
+          lastActive: log.timestamp
+        };
+      }
+      appMap[key].runs++;
+      if (log.status === "success") {
+        appMap[key].successCount++;
+        if (log.latencyMs > 0) appMap[key].latencies.push(log.latencyMs);
+      } else {
+        appMap[key].errorCount++;
+      }
+      appMap[key].tokens += (log.tokensTotal || 0);
+    }
+
+    const appBreakdown = Object.values(appMap).map(app => ({
+      id: app.id,
+      name: app.name,
+      category: app.category,
+      icon: app.icon,
+      runs: app.runs,
+      percentOfTotal: totalRuns > 0 ? Math.round((app.runs / totalRuns) * 100) : 0,
+      avgLatencyMs: app.latencies.length > 0
+        ? Math.round(app.latencies.reduce((a, b) => a + b, 0) / app.latencies.length)
+        : 0,
+      totalTokens: app.tokens,
+      successRate: app.runs > 0 ? Number(((app.successCount / app.runs) * 100).toFixed(1)) : 100,
+      lastActive: app.lastActive
+    })).sort((a, b) => b.runs - a.runs);
+
+    // Timeline series (grouped chronologically into 12 buckets)
+    const timeline = this.generateTimelineBuckets(12);
 
     return {
       totalRuns,
+      successfulRuns,
+      errorRuns,
       successRate: totalRuns > 0 ? Number(((successfulRuns / totalRuns) * 100).toFixed(1)) : 100,
       avgLatencyMs: avgLatency,
+      p95LatencyMs,
+      minLatencyMs,
+      maxLatencyMs,
       totalTokens,
-      appUsage,
-      recentLogs: this.executionLogs.slice(0, 20)
+      avgTokensPerRun,
+      activeAppsCount: appBreakdown.length,
+      channelBreakdown,
+      toolBreakdown,
+      latencyDistribution,
+      appBreakdown,
+      timeline,
+      recentLogs: this.executionLogs.slice(0, 50)
     };
+  }
+
+  generateTimelineBuckets(bucketCount = 12) {
+    if (this.executionLogs.length === 0) return [];
+    
+    // Sort logs from oldest to newest
+    const sorted = [...this.executionLogs].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+    const minTime = new Date(sorted[0].timestamp).getTime();
+    const maxTime = Math.max(Date.now(), new Date(sorted[sorted.length - 1].timestamp).getTime() + 1000);
+    const interval = Math.max((maxTime - minTime) / bucketCount, 60000); // at least 1 min per bucket
+
+    const buckets = [];
+    for (let i = 0; i < bucketCount; i++) {
+      const bucketStart = minTime + (i * interval);
+      const bucketEnd = bucketStart + interval;
+      const bucketDate = new Date(bucketStart);
+      const label = `${bucketDate.getHours().toString().padStart(2, '0')}:${bucketDate.getMinutes().toString().padStart(2, '0')}`;
+
+      const logsInBucket = sorted.filter(l => {
+        const t = new Date(l.timestamp).getTime();
+        return t >= bucketStart && t < bucketEnd;
+      });
+
+      const runs = logsInBucket.length;
+      const successCount = logsInBucket.filter(l => l.status === "success").length;
+      const errorCount = runs - successCount;
+      const validLats = logsInBucket.filter(l => l.status === "success" && l.latencyMs > 0);
+      const avgLatency = validLats.length > 0 
+        ? Math.round(validLats.reduce((a, b) => a + b.latencyMs, 0) / validLats.length)
+        : 0;
+      const tokens = logsInBucket.reduce((a, b) => a + (b.tokensTotal || 0), 0);
+
+      buckets.push({
+        timestamp: new Date(bucketStart).toISOString(),
+        label,
+        runs,
+        successCount,
+        errorCount,
+        avgLatency,
+        tokens
+      });
+    }
+
+    return buckets;
   }
 }
 
 export const store = new Store();
+

@@ -36,7 +36,10 @@ appsRouter.get("/:id", (req, res) => {
 
 // POST /api/v1/apps - create a new mini-app
 appsRouter.post("/", (req, res) => {
-  const { name, description, category, icon, systemPrompt, tools, inputs, theme, sampleQuery, webhookUrl } = req.body;
+  const { 
+    name, description, category, icon, systemPrompt, tools, inputs, 
+    theme, sampleQuery, webhookUrl, cooldownSeconds, maxRequestsPerSession, quotaExceededMessage 
+  } = req.body;
   if (!name) {
     return res.status(400).json({ error: "App name is required", code: "MISSING_NAME" });
   }
@@ -51,7 +54,10 @@ appsRouter.post("/", (req, res) => {
     inputs,
     theme,
     sampleQuery,
-    webhookUrl
+    webhookUrl,
+    cooldownSeconds,
+    maxRequestsPerSession,
+    quotaExceededMessage
   });
 
   res.status(201).json({ status: "success", data: created });
@@ -98,6 +104,23 @@ appsRouter.post("/:id/run", async (req, res) => {
   }
 
   const { query, inputs = {}, sessionId } = req.body || {};
+  const clientIp = req.headers["x-forwarded-for"] || req.socket.remoteAddress || "anonymous";
+  const clientKey = `${app.id}_${sessionId || clientIp}`;
+
+  // Rate Limiting, Anti-Spam Burst Cooldown & Session Quota Check
+  const rateLimitCheck = store.checkRateLimit({ app, clientKey, callerInfo });
+  if (rateLimitCheck.headers) {
+    Object.entries(rateLimitCheck.headers).forEach(([k, v]) => res.setHeader(k, v));
+  }
+
+  if (!rateLimitCheck.allowed) {
+    return res.status(429).json({
+      status: "error",
+      error: rateLimitCheck.error,
+      code: rateLimitCheck.code,
+      cooldown_remaining: rateLimitCheck.cooldownRemaining || 0
+    });
+  }
 
   try {
     const agentResult = await runAgentWithTools({
@@ -143,6 +166,7 @@ appsRouter.post("/:id/run", async (req, res) => {
         tool_data: agentResult.toolResults
       },
       metadata: {
+
         latency_ms: agentResult.latencyMs,
         tokens_used: agentResult.tokensTotal,
         model: agentResult.model,

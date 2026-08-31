@@ -37,6 +37,9 @@ export const AppEditorPage: React.FC = () => {
   const [widgetLayout, setWidgetLayout] = useState<'card' | 'floating'>('card');
   const [displayMode, setDisplayMode] = useState<'form' | 'direct' | 'result_only'>('form');
   const [webhookUrl, setWebhookUrl] = useState('');
+  const [cooldownSeconds, setCooldownSeconds] = useState<number>(3);
+  const [maxRequestsPerSession, setMaxRequestsPerSession] = useState<number>(10);
+  const [quotaExceededMessage, setQuotaExceededMessage] = useState<string>('You have reached the free query limit for this session. Please check back later or contact the administrator.');
 
   // Simulator State
   const [simInputs, setSimInputs] = useState<Record<string, any>>({});
@@ -57,6 +60,9 @@ export const AppEditorPage: React.FC = () => {
       setDescription('Autonomous assistant that pulls insights and calculates optimal outputs.');
       setSystemPrompt('You are a concise research agent. Analyze the provided query and generate a crisp briefing.');
       setTools(['world_clock']);
+      setCooldownSeconds(3);
+      setMaxRequestsPerSession(10);
+      setQuotaExceededMessage('You have reached the free query limit for this session. Please check back later or contact the administrator.');
       setInputs([
         { id: 'topic', label: 'Research Topic / Query', type: 'text', placeholder: 'e.g. Autonomous AI Agents', required: true, default: 'Autonomous AI Agents' },
         { id: 'format', label: 'Output Format', type: 'select', options: ['Executive Summary', 'Key Bullet Points', 'Technical Analysis'], required: true, default: 'Executive Summary' }
@@ -81,6 +87,9 @@ export const AppEditorPage: React.FC = () => {
       setWidgetLayout(app.theme?.widgetLayout || 'card');
       setDisplayMode(app.theme?.displayMode || (app.slug?.includes('fortune') ? 'direct' : 'form'));
       setWebhookUrl(app.webhookUrl || '');
+      setCooldownSeconds(app.cooldownSeconds !== undefined ? app.cooldownSeconds : 3);
+      setMaxRequestsPerSession(app.maxRequestsPerSession !== undefined ? app.maxRequestsPerSession : 10);
+      setQuotaExceededMessage(app.quotaExceededMessage || 'You have reached the free query limit for this session. Please check back later or contact the administrator.');
 
       const initSim: Record<string, any> = {};
       app.inputs?.forEach(inp => { initSim[inp.id] = inp.default || ''; });
@@ -105,14 +114,12 @@ export const AppEditorPage: React.FC = () => {
   }
 
   function handleRemoveInput(index: number) {
-    const next = [...inputs];
-    next.splice(index, 1);
-    setInputs(next);
+    setInputs(inputs.filter((_, i) => i !== index));
   }
 
-  function handleUpdateInput(index: number, field: Partial<MiniAppInput>) {
+  function handleUpdateInput(index: number, updates: Partial<MiniAppInput>) {
     const next = [...inputs];
-    next[index] = { ...next[index], ...field };
+    next[index] = { ...next[index], ...updates };
     setInputs(next);
   }
 
@@ -125,28 +132,34 @@ export const AppEditorPage: React.FC = () => {
   }
 
   async function handleSave() {
-    setSaving(true);
-    setSaveSuccess(false);
-    const payload: Partial<MiniApp> = {
-      name,
-      slug,
-      category,
-      icon,
-      description,
-      systemPrompt,
-      tools,
-      inputs,
-      webhookUrl,
-      theme: {
-        primaryColor,
-        mode: 'dark',
-        badge,
-        widgetLayout,
-        displayMode
-      }
-    };
-
+    if (!name.trim()) {
+      alert('App Name is required');
+      return;
+    }
     try {
+      setSaving(true);
+      const payload: Partial<MiniApp> = {
+        name,
+        slug,
+        category,
+        icon,
+        description,
+        systemPrompt,
+        tools,
+        inputs,
+        theme: {
+          primaryColor,
+          mode: 'dark',
+          badge,
+          widgetLayout,
+          displayMode
+        },
+        webhookUrl,
+        cooldownSeconds: Number(cooldownSeconds) || 0,
+        maxRequestsPerSession: Number(maxRequestsPerSession) || 0,
+        quotaExceededMessage
+      };
+
       if (isNew) {
         const created = await createApp(payload);
         navigate(`/editor/${created.id}`);
@@ -260,7 +273,7 @@ export const AppEditorPage: React.FC = () => {
         <div className="flex items-center gap-2 flex-1 max-w-md">
           <input
             type="text"
-            placeholder="e.g. Asistente para calcular costos de envío..."
+            placeholder="e.g. Smart assistant to calculate international shipping costs..."
             value={aiRefinePrompt}
             onChange={(e) => setAiRefinePrompt(e.target.value)}
             className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-indigo-500"
@@ -451,6 +464,75 @@ export const AppEditorPage: React.FC = () => {
               />
               <p className="text-[11px] text-slate-500 mt-1">
                 Triggered asynchronously when execution finishes, sending inputs and AI results payload.
+              </p>
+            </div>
+          </div>
+
+          {/* Rate Limiting, Anti-Spam Cooldown & Session Quota Limits */}
+          <div className="p-6 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-4">
+            <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
+              <Settings2 size={18} className="text-emerald-400" />
+              <div>
+                <h2 className="font-bold text-base text-white">Anti-Spam Cooldown & Session Quotas</h2>
+                <p className="text-[11px] text-slate-400">Protect your agent against rapid-click spam and enforce free consultation caps</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Burst Cooldown (Seconds)
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    max="60"
+                    value={cooldownSeconds}
+                    onChange={(e) => setCooldownSeconds(Number(e.target.value))}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                  />
+                  <span className="text-xs text-slate-400 font-mono">sec</span>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Minimum wait time required between consecutive queries from the same user (0 to disable).
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Max Requests Per Session / IP
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    max="1000"
+                    value={maxRequestsPerSession}
+                    onChange={(e) => setMaxRequestsPerSession(Number(e.target.value))}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                  />
+                  <span className="text-xs text-slate-400 font-mono">runs</span>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Total free executions allowed per session (0 for unlimited).
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">
+                Custom Quota Exceeded Message
+              </label>
+              <textarea
+                value={quotaExceededMessage}
+                onChange={(e) => setQuotaExceededMessage(e.target.value)}
+                rows={2}
+                placeholder="You have reached the free query limit for this session. Please check back later or contact the administrator."
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 leading-relaxed"
+              />
+              <p className="text-[11px] text-slate-500 mt-1">
+                Displayed in widget when user reaches maximum allowed requests.
               </p>
             </div>
           </div>

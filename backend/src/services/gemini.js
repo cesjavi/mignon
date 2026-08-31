@@ -210,7 +210,12 @@ Return ONLY valid JSON without markdown wrapping:
       if (res.ok) {
         const data = await res.json();
         let rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-        rawText = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
+        rawText = rawText.replace(/```json/gi, "").replace(/```/g, "").trim();
+        const firstBrace = rawText.indexOf('{');
+        const lastBrace = rawText.lastIndexOf('}');
+        if (firstBrace !== -1 && lastBrace !== -1) {
+          rawText = rawText.substring(firstBrace, lastBrace + 1);
+        }
         const parsed = JSON.parse(rawText);
         return parsed;
       }
@@ -535,6 +540,56 @@ async function executeSimulatedAgent({ app, userQuery, inputValues }) {
       toolExecuted: "world_clock",
       toolResults,
       tokensTotal: 210
+    };
+  }
+
+  // If tool is currency_converter
+  if (appTools.includes("currency_converter")) {
+    const toolResults = await executeTool("currency_converter", {
+      amount: inputValues.amount || 1000,
+      from_currency: inputValues.from_currency || "USD",
+      to_currency: inputValues.to_currency || "EUR"
+    });
+
+    const c = toolResults.conversion;
+    const summaryText = `💱 **Currency Exchange Conversion**\n\n` +
+      `• **Converted Amount:** **${c.converted_amount.toLocaleString()} ${c.target_currency}** (from ${c.original_amount.toLocaleString()} ${c.from_currency})\n` +
+      `• **Live Exchange Rate:** \`1 ${c.from_currency} = ${c.exchange_rate} ${c.target_currency}\` (Inverse: \`1 ${c.target_currency} = ${c.inverse_rate} ${c.from_currency}\`)\n` +
+      `• **Market Status & Trend:** ${c.market_status} • ${c.trend_24h}\n\n` +
+      `*Real-time conversion executed by Smart FX Agent.*`;
+
+    return {
+      status: "success",
+      text: summaryText,
+      toolExecuted: "currency_converter",
+      toolResults,
+      tokensTotal: 195
+    };
+  }
+
+  // If tool is lead_qualifier
+  if (appTools.includes("lead_qualifier")) {
+    const toolResults = await executeTool("lead_qualifier", {
+      company_name: inputValues.company_name || "Apex Logistics",
+      industry: inputValues.industry || "Supply Chain & Logistics",
+      budget_range: inputValues.budget_range || "$10k-$50k",
+      use_case: inputValues.use_case || "Automated customer operations agents"
+    });
+
+    const l = toolResults.lead_evaluation;
+    const summaryText = `🎯 **Lead Qualification & Scoring: ${l.company_name}**\n\n` +
+      `• **Qualification Tier:** **${l.qualification_tier}** (Score: \`${l.qualification_score}/100\`)\n` +
+      `• **Priority Rating:** ${l.priority_level}\n` +
+      `• **Recommended Architecture:** ${l.recommended_agent_package}\n` +
+      `• **Actionable Next Step:** ${l.suggested_next_action}\n\n` +
+      `*Lead scored autonomously by Mignon Concierge Engine.*`;
+
+    return {
+      status: "success",
+      text: summaryText,
+      toolExecuted: "lead_qualifier",
+      toolResults,
+      tokensTotal: 240
     };
   }
 

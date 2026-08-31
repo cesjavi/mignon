@@ -29,6 +29,9 @@ export interface MiniApp {
   theme: MiniAppTheme;
   sampleQuery?: string;
   webhookUrl?: string;
+  cooldownSeconds?: number;
+  maxRequestsPerSession?: number;
+  quotaExceededMessage?: string;
   createdAt: string;
   updatedAt?: string;
 }
@@ -36,6 +39,7 @@ export interface MiniApp {
 export interface ApiKeyRecord {
   id: string;
   name: string;
+  dailyQuota?: number;
   prefix: string;
   createdAt: string;
   lastUsedAt: string | null;
@@ -57,12 +61,68 @@ export interface ExecutionLog {
   error?: string;
 }
 
-export interface AnalyticsData {
-  totalRuns: number;
-  successRate: number;
+export interface TimelinePoint {
+  timestamp: string;
+  label: string;
+  runs: number;
+  successCount: number;
+  errorCount: number;
+  avgLatency: number;
+  tokens: number;
+}
+
+export interface AppUsageStat {
+  id: string;
+  name: string;
+  category: string;
+  icon: string;
+  runs: number;
+  percentOfTotal: number;
   avgLatencyMs: number;
   totalTokens: number;
-  appUsage: Record<string, number>;
+  successRate: number;
+  lastActive: string;
+}
+
+export interface ToolUsageStat {
+  tool: string;
+  count: number;
+  percent: number;
+}
+
+export interface ChannelStat {
+  count: number;
+  percent: number;
+}
+
+export interface LatencyDistribution {
+  under500ms: number;
+  between500and1000ms: number;
+  between1000and2000ms: number;
+  over2000ms: number;
+}
+
+export interface AnalyticsData {
+  totalRuns: number;
+  successfulRuns: number;
+  errorRuns: number;
+  successRate: number;
+  avgLatencyMs: number;
+  p95LatencyMs: number;
+  minLatencyMs: number;
+  maxLatencyMs: number;
+  totalTokens: number;
+  avgTokensPerRun: number;
+  activeAppsCount: number;
+  channelBreakdown: {
+    widget: ChannelStat;
+    api: ChannelStat;
+    studio: ChannelStat;
+  };
+  toolBreakdown: ToolUsageStat[];
+  latencyDistribution: LatencyDistribution;
+  appBreakdown: AppUsageStat[];
+  timeline: TimelinePoint[];
   recentLogs: ExecutionLog[];
 }
 
@@ -144,13 +204,24 @@ export async function fetchApiKeys(): Promise<ApiKeyRecord[]> {
   return json.data;
 }
 
-export async function createApiKey(name: string): Promise<ApiKeyRecord> {
+export async function createApiKey(name: string, dailyQuota: number = 500): Promise<ApiKeyRecord> {
   const res = await fetch(`${API_BASE}/keys`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, dailyQuota }),
   });
   if (!res.ok) throw new Error('Failed to create API key');
+  const json = await res.json();
+  return json.data;
+}
+
+export async function updateApiKey(id: string, updates: { name?: string; dailyQuota?: number }): Promise<ApiKeyRecord> {
+  const res = await fetch(`${API_BASE}/keys/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updates),
+  });
+  if (!res.ok) throw new Error('Failed to update API key');
   const json = await res.json();
   return json.data;
 }
@@ -163,6 +234,27 @@ export async function revokeApiKey(id: string): Promise<void> {
 export async function fetchAnalytics(): Promise<AnalyticsData> {
   const res = await fetch(`${API_BASE}/analytics`);
   if (!res.ok) throw new Error('Failed to fetch analytics');
+  const json = await res.json();
+  return json.data;
+}
+
+export async function simulateTraffic(count: number = 5): Promise<AnalyticsData> {
+  const res = await fetch(`${API_BASE}/analytics/simulate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ count }),
+  });
+  if (!res.ok) throw new Error('Failed to simulate traffic');
+  const json = await res.json();
+  return json.data;
+}
+
+export async function clearAnalytics(): Promise<AnalyticsData> {
+  const res = await fetch(`${API_BASE}/analytics/clear`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!res.ok) throw new Error('Failed to clear analytics');
   const json = await res.json();
   return json.data;
 }

@@ -266,6 +266,11 @@
           align-items: center;
           justify-content: center;
           gap: 6px;
+          transition: opacity 0.2s ease, transform 0.1s ease;
+        }
+        .btn-submit:disabled {
+          opacity: 0.65;
+          cursor: not-allowed;
         }
         .result-box {
           padding: 14px;
@@ -283,6 +288,20 @@
           color: #e2e8f0;
           white-space: pre-wrap;
           font-family: ${app.slug?.includes("fortune") ? "'JetBrains Mono', monospace" : "inherit"};
+        }
+
+        .quota-banner {
+          background: rgba(239, 68, 68, 0.15);
+          border: 1px solid rgba(239, 68, 68, 0.4);
+          color: #fca5a5;
+          padding: 10px 12px;
+          border-radius: 8px;
+          font-size: 12px;
+          line-height: 1.45;
+          margin-top: 10px;
+          display: flex;
+          align-items: flex-start;
+          gap: 8px;
         }
         
         .result-only-bar {
@@ -302,11 +321,13 @@
           cursor: pointer;
         }
         .mini-btn:hover { background: #334155; color: #fff; }
+        .mini-btn:disabled { opacity: 0.5; cursor: not-allowed; }
       </style>
 
       ${isResultOnly ? `
         <!-- Pure Result Only View -->
         <div class="result-text" id="result-content">Loading...</div>
+        <div id="quota-warning-container"></div>
         <div id="dynamic-cards"></div>
         <div class="result-only-bar">
           <button class="mini-btn" id="refresh-btn" title="Refresh Output">🔄</button>
@@ -334,6 +355,8 @@
             </button>
           </form>
 
+          <div id="quota-warning-container"></div>
+
           <div class="result-box ${isDirect ? 'active' : ''}" id="result-container">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px solid #1e293b; padding-bottom: 6px;">
               <span style="font-size: 11px; font-weight: 700; color: #38bdf8;">${isDirect ? '🌟 Quote / Result' : '⚡ Gemini Output'}</span>
@@ -357,15 +380,52 @@
     const submitBtn = shadow.getElementById("submit-btn");
     const resultBox = shadow.getElementById("result-container");
     const resultContent = shadow.getElementById("result-content");
+    const quotaWarningContainer = shadow.getElementById("quota-warning-container");
     const ttsBtn = shadow.getElementById("tts-btn");
     const copyBtn = shadow.getElementById("copy-btn");
     const refreshBtn = shadow.getElementById("refresh-btn");
 
+    let isExecuting = false;
+    let isQuotaExceeded = false;
+    let cooldownTimer = null;
+
+    function startCooldownCountdown(seconds) {
+      if (seconds <= 0 || isQuotaExceeded) return;
+      let remaining = seconds;
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = `<span>⏳ Cooldown (${remaining}s)...</span>`;
+      }
+      if (refreshBtn) refreshBtn.disabled = true;
+
+      if (cooldownTimer) clearInterval(cooldownTimer);
+      cooldownTimer = setInterval(() => {
+        remaining--;
+        if (remaining <= 0) {
+          clearInterval(cooldownTimer);
+          cooldownTimer = null;
+          if (!isQuotaExceeded) {
+            if (submitBtn) {
+              submitBtn.disabled = false;
+              submitBtn.innerHTML = `<span>Execute with Gemini Agent</span> <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>`;
+            }
+            if (refreshBtn) refreshBtn.disabled = false;
+          }
+        } else {
+          if (submitBtn) submitBtn.innerHTML = `<span>⏳ Cooldown (${remaining}s)...</span>`;
+        }
+      }, 1000);
+    }
+
     async function executeApp(inputPayload) {
+      if (isExecuting || isQuotaExceeded) return;
+      isExecuting = true;
+
       if (submitBtn) {
         submitBtn.disabled = true;
         submitBtn.innerHTML = `<span>Executing Agent...</span>`;
       }
+      if (refreshBtn) refreshBtn.disabled = true;
       resultContent.innerText = "Generating...";
 
       try {
@@ -375,20 +435,83 @@
           body: JSON.stringify({ inputs: inputPayload, sessionId })
         });
 
-        if (!res.ok) throw new Error("Execution returned an error");
         const data = await res.json();
+
+        if (res.status === 429) {
+          // Rate Limit or Quota Exceeded
+          if (data.code === "QUOTA_EXCEEDED") {
+            isQuotaExceeded = true;
+            resultContent.innerText = `⚠️ ${data.error || "Session limit reached."}`;
+            if (quotaWarningContainer) {
+              quotaWarningContainer.innerHTML = `
+                <div class="quota-banner">
+                  <span>⚠️</span>
+                  <div><strong>Query Limit:</strong> ${data.error}</div>
+                </div>
+              `;
+            }
+            if (submitBtn) {
+              submitBtn.disabled = true;
+              submitBtn.innerHTML = `<span>Session Limit Reached</span>`;
+            }
+            if (refreshBtn) refreshBtn.disabled = true;
+            if (resultBox) resultBox.classList.add("active");
+            return;
+          } else if (data.code === "COOLDOWN_ACTIVE") {
+            resultContent.innerText = `⏳ ${data.error || "Please wait a moment."}`;
+            if (resultBox) resultBox.classList.add("active");
+            startCooldownCountdown(data.cooldown_remaining || app.cooldownSeconds || 3);
+            return;
+          }
+        }
+
+        if (!res.ok) {
+          throw new Error(data.error || "Execution returned an error");
+        }
+
         resultContent.innerText = data.result?.markdown || "Execution complete.";
         if (resultBox) resultBox.classList.add("active");
+
+        // Read remaining and cooldown headers
+        const remainingRuns = res.headers.get("X-RateLimit-Remaining");
+        const cooldownSec = parseInt(res.headers.get("X-RateLimit-Cooldown") || String(app.cooldownSeconds ?? 3));
+
+        if (remainingRuns !== null && parseInt(remainingRuns) === 0) {
+          isQuotaExceeded = true;
+          if (quotaWarningContainer) {
+            quotaWarningContainer.innerHTML = `
+              <div class="quota-banner">
+                <span>⚠️</span>
+                <div>${app.quotaExceededMessage || "You have reached the free query limit for this session."}</div>
+              </div>
+            `;
+          }
+          if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = `<span>Session Limit Reached</span>`;
+          }
+        } else if (cooldownSec > 0) {
+          startCooldownCountdown(cooldownSec);
+        } else {
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = `<span>Execute with Gemini Agent</span> <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>`;
+          }
+          if (refreshBtn) refreshBtn.disabled = false;
+        }
       } catch (err) {
         resultContent.innerText = `⚠️ Error: ${err.message}`;
         if (resultBox) resultBox.classList.add("active");
-      } finally {
-        if (submitBtn) {
+        if (submitBtn && !isQuotaExceeded) {
           submitBtn.disabled = false;
           submitBtn.innerHTML = `<span>Execute with Gemini Agent</span> <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>`;
         }
+        if (refreshBtn && !isQuotaExceeded) refreshBtn.disabled = false;
+      } finally {
+        isExecuting = false;
       }
     }
+
 
     // Auto-run if direct or result_only
     if (isAutoRun) {

@@ -1,13 +1,14 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutGrid, Code, Key, Activity, Sparkles, PlusCircle } from 'lucide-react';
+import { LayoutGrid, Code, Key, Activity, Sparkles, PlusCircle, Link2 } from 'lucide-react';
 
 const NAV_ITEMS = [
   { to: '/', label: 'Mini-Apps Studio', icon: LayoutGrid, end: true },
   { to: '/embed', label: 'Embed & Widgets', icon: Sparkles },
   { to: '/api-docs', label: 'API Instructions', icon: Code },
   { to: '/keys', label: 'API Keys', icon: Key },
-  { to: '/analytics', label: 'Observability & Logs', icon: Activity },
+  { to: '/analytics', label: 'Usage & Analytics', icon: Activity },
+  { to: '/links', label: 'Project Links', icon: Link2 },
 ];
 
 export const Sidebar: React.FC = () => {

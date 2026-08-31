@@ -11,13 +11,22 @@ keysRouter.get("/", (req, res) => {
 
 // POST /api/v1/keys - generate a new API key
 keysRouter.post("/", (req, res) => {
-  const { name = "Developer Key" } = req.body || {};
-  const created = store.createApiKey(name);
+  const { name = "Developer Key", dailyQuota = 500 } = req.body || {};
+  const created = store.createApiKey(name, dailyQuota);
   res.status(201).json({
     status: "success",
     message: "API Key created successfully. Copy the secret key now, it will not be displayed again.",
     data: created
   });
+});
+
+// PUT /api/v1/keys/:id - update API key name or daily quota
+keysRouter.put("/:id", (req, res) => {
+  const updated = store.updateApiKey(req.params.id, req.body || {});
+  if (!updated) {
+    return res.status(404).json({ error: "Key not found", code: "KEY_NOT_FOUND" });
+  }
+  res.json({ status: "success", data: updated });
 });
 
 // DELETE /api/v1/keys/:id - revoke an API key

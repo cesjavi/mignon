@@ -288,6 +288,46 @@ console.log(run.result.markdown);`;
           </div>
         </div>
       </section>
+
+      {/* Official Project Links */}
+      <section className="p-6 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div className="flex items-center gap-2">
+            <Globe size={18} className="text-sky-400" />
+            <h2 className="font-bold text-base text-white">Project Links & Resources</h2>
+          </div>
+          <span className="text-xs text-sky-400 bg-sky-500/10 px-2.5 py-1 rounded-md border border-sky-500/20 font-medium">Official Endpoints</span>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead>
+              <tr className="border-b border-slate-800 text-slate-400 font-semibold uppercase tracking-wider">
+                <th className="py-2.5 px-3">Link / Label</th>
+                <th className="py-2.5 px-3">URL</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800/60 text-slate-300 font-mono">
+              <tr>
+                <td className="py-2.5 px-3 font-sans font-semibold text-white">Live App & Studio</td>
+                <td className="py-2.5 px-3 text-sky-400"><a href="https://mignon-platform-526192292529.us-central1.run.app/" target="_blank" rel="noreferrer" className="hover:underline">https://mignon-platform-526192292529.us-central1.run.app/</a></td>
+              </tr>
+              <tr>
+                <td className="py-2.5 px-3 font-sans font-semibold text-white">Interactive Widgets Showcase</td>
+                <td className="py-2.5 px-3 text-sky-400"><a href="https://mignon-platform-526192292529.us-central1.run.app/demo.html" target="_blank" rel="noreferrer" className="hover:underline">https://mignon-platform-526192292529.us-central1.run.app/demo.html</a></td>
+              </tr>
+              <tr>
+                <td className="py-2.5 px-3 font-sans font-semibold text-white">Real-time Observability Dashboard</td>
+                <td className="py-2.5 px-3 text-sky-400"><a href="https://mignon-platform-526192292529.us-central1.run.app/analytics" target="_blank" rel="noreferrer" className="hover:underline">https://mignon-platform-526192292529.us-central1.run.app/analytics</a></td>
+              </tr>
+              <tr>
+                <td className="py-2.5 px-3 font-sans font-semibold text-white">GitHub Repository</td>
+                <td className="py-2.5 px-3 text-sky-400"><a href="https://github.com/cesjavi/mignon" target="_blank" rel="noreferrer" className="hover:underline">https://github.com/cesjavi/mignon</a></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
   );
 };

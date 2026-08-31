@@ -1,35 +1,37 @@
-# 📋 Mignon - Próximas Tareas (Roadmap)
+# 📋 Mignon - Roadmap & Task Tracker
 
-## ⏳ Tarea Prioritaria: Prevención de Peticiones Seguidas & Cuota Límite
+## ✅ Completed Task: Rapid Request Prevention, Burst Cooldown & Usage Quotas (Implemented 2026-08-31)
 
-### 🎯 Objetivo
-1. **Evitar spam / clics seguidos:** Bloquear peticiones consecutivas inmediatas mediante cooldown / debounce.
-2. **Establecer límite de uso (Cuotas):** Limitar la cantidad máxima de consultas permitidas por usuario, IP, sesión o API Key (ej. máximo 5 o 10 consultas por sesión/día).
+### 🎯 Completed Objectives
+1. **Prevent spam / rapid clicks:** Block immediate consecutive requests using active backend cooldown / debounce and visual countdown timer on widgets.
+2. **Establish usage limits (Quotas):** Configurable free query limit per session/IP and per API Key with standard HTTP headers and user-friendly error banners.
 
 ---
 
-### 🛠️ Especificación Técnica Planificada
+### 🛠️ Implementation Summary
 
-#### 1. Cooldown & Debounce Anti-Spam (Tiempo entre peticiones)
+#### 1. Anti-Spam Burst Cooldown & Debounce (Time between requests) ✅
 * **Widget / Frontend:**
-  - Deshabilitar el botón de ejecución inmediatamente al hacer clic.
-  - Temporizador de enfriamiento visual (*cooldown de 3 a 5 segundos*) antes de permitir otra ejecución.
-  - Cancelación de peticiones redundantes en vuelo.
+  - Immediate submission button disable on click to prevent duplicate in-flight requests.
+  - Visual cooling countdown timer with real-time seconds counter (`⏳ Cooldown (3s)...`) before re-enabling the button.
+  - Redundant in-flight request cancellation.
 * **Backend:**
-  - Bloqueo de ráfagas: mínimo 2 segundos entre consultas de la misma IP / `sessionId`.
+  - Burst protection: minimum configurable time enforcement between requests from the same IP / `sessionId` (returns HTTP 429 `COOLDOWN_ACTIVE`).
 
-#### 2. Límite de Cuota por Sesión / IP / Mini-App (Usage Quota Limit)
-* **Límite de Consultas Gratuitas:**
-  - Contador de ejecuciones por `sessionId` o IP (ejemplo: **máximo 5 a 10 consultas gratis**).
-  - Al alcanzar el cupo máximo, mostrar un mensaje claro en el widget:
-    > *"Has alcanzado el límite gratuito de consultas para esta sesión. Vuelve más tarde o contacta al administrador."*
-* **Configuración en el Editor de Mini-Apps:**
-  - `maxRequestsPerSession: 10` (campo configurable por el creador).
-  - `cooldownSeconds: 3`
-* **Protección a Nivel de API Gateway:**
-  - Control de cuotas por API Key (ej. 100 req/día para tier Free, 10.000 req/día para Enterprise).
-  - Headers HTTP estándar: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`.
+#### 2. Usage Quota Limits per Session / IP / Mini-App ✅
+* **Free Query Limits:**
+  - Execution counter per `sessionId` and IP for each Mini-App.
+  - When the quota limit is reached, an informative banner is displayed in the widget:
+    > *"You have reached the free query limit for this session. Please check back later or contact the administrator."*
+* **Mini-App Editor Configuration (`AppEditorPage.tsx`):**
+  - `Burst Cooldown (Seconds)`: customizable per app (default: 3s).
+  - `Max Requests Per Session / IP`: customizable per app (default: 10 queries, 0 = unlimited).
+  - `Custom Quota Exceeded Message`: customizable error notification string.
+* **API Gateway Protection:**
+  - Configurable daily quota per API Key (default: 500 req/day with daily reset at midnight UTC).
+  - Standard HTTP headers in every response:
+    - `X-RateLimit-Limit`
+    - `X-RateLimit-Remaining`
+    - `X-RateLimit-Reset`
+    - `X-RateLimit-Cooldown`
 
----
-
-*Anotado el 2026-08-31 • Listo para retomar e implementar al despertar.* ☕
