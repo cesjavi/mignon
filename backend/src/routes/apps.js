@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { store } from "../services/store.js";
-import { runAgentWithTools } from "../services/gemini.js";
+import { runAgentWithTools, generateMiniAppWithGemini } from "../services/gemini.js";
 
 export const appsRouter = Router();
 
@@ -8,6 +8,21 @@ export const appsRouter = Router();
 appsRouter.get("/", (req, res) => {
   const apps = store.getAllApps();
   res.json({ status: "success", count: apps.length, data: apps });
+});
+
+// POST /api/v1/apps/generate - "Prompt-to-App" with Gemini AI
+appsRouter.post("/generate", async (req, res) => {
+  const { prompt } = req.body;
+  if (!prompt) {
+    return res.status(400).json({ error: "Prompt is required", code: "MISSING_PROMPT" });
+  }
+
+  try {
+    const generatedApp = await generateMiniAppWithGemini({ userIdea: prompt });
+    res.json({ status: "success", data: generatedApp });
+  } catch (err) {
+    res.status(500).json({ error: err.message, code: "GENERATION_FAILED" });
+  }
 });
 
 // GET /api/v1/apps/:id - get mini-app details & metadata
@@ -21,7 +36,7 @@ appsRouter.get("/:id", (req, res) => {
 
 // POST /api/v1/apps - create a new mini-app
 appsRouter.post("/", (req, res) => {
-  const { name, description, category, systemPrompt, tools, inputs, theme, sampleQuery } = req.body;
+  const { name, description, category, icon, systemPrompt, tools, inputs, theme, sampleQuery, webhookUrl } = req.body;
   if (!name) {
     return res.status(400).json({ error: "App name is required", code: "MISSING_NAME" });
   }
@@ -30,11 +45,13 @@ appsRouter.post("/", (req, res) => {
     name,
     description,
     category,
+    icon,
     systemPrompt,
     tools,
     inputs,
     theme,
-    sampleQuery
+    sampleQuery,
+    webhookUrl
   });
 
   res.status(201).json({ status: "success", data: created });
@@ -58,7 +75,7 @@ appsRouter.delete("/:id", (req, res) => {
   res.json({ status: "success", message: "Mini-App deleted successfully" });
 });
 
-// POST /api/v1/apps/:id/run - execute mini-app (either via Embed Widget or REST API with Bearer token)
+// POST /api/v1/apps/:id/run - execute mini-app with Gemini Tools & Webhook dispatch
 appsRouter.post("/:id/run", async (req, res) => {
   const app = store.getAppById(req.params.id);
   if (!app) {
@@ -80,13 +97,14 @@ appsRouter.post("/:id/run", async (req, res) => {
     callerInfo = { type: "api", keyId: authResult.keyId, name: authResult.name };
   }
 
-  const { query, inputs = {} } = req.body || {};
+  const { query, inputs = {}, sessionId } = req.body || {};
 
   try {
     const agentResult = await runAgentWithTools({
       app,
       userQuery: query || app.sampleQuery,
-      inputValues: inputs
+      inputValues: inputs,
+      sessionId
     });
 
     // Log telemetry
@@ -101,10 +119,24 @@ appsRouter.post("/:id/run", async (req, res) => {
       queryPreview: (query || JSON.stringify(inputs)).substring(0, 80)
     });
 
+    // Asynchronous Webhook Dispatch if configured
+    if (app.webhookUrl && app.webhookUrl.startsWith("http")) {
+      dispatchWebhook(app.webhookUrl, {
+        event: "mini_app_executed",
+        app_id: app.id,
+        app_name: app.name,
+        inputs,
+        result: agentResult.text,
+        tool_executed: agentResult.toolExecuted,
+        timestamp: new Date().toISOString()
+      }).catch(e => console.warn("Webhook dispatch error:", e.message));
+    }
+
     res.json({
       status: "success",
       app_id: app.id,
       app_name: app.name,
+      session_id: sessionId || null,
       result: {
         markdown: agentResult.text,
         tool_executed: agentResult.toolExecuted,
@@ -136,3 +168,11 @@ appsRouter.post("/:id/run", async (req, res) => {
     });
   }
 });
+
+async function dispatchWebhook(url, payload) {
+  await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "User-Agent": "Mignon-Agent-Engine/1.0" },
+    body: JSON.stringify(payload)
+  });
+}

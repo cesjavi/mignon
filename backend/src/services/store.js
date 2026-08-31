@@ -1,6 +1,6 @@
 import crypto from "crypto";
 
-// Initial seed mini-apps
+// Initial seed mini-apps with rich presets
 const INITIAL_APPS = [
   {
     id: "app_flight_scout",
@@ -9,7 +9,7 @@ const INITIAL_APPS = [
     category: "Travel & Logistics",
     icon: "Plane",
     description: "Autonomous agent widget that finds real-time flights, compares fares, carbon footprint and recommends optimal routes.",
-    systemPrompt: `You are the Flight Scout Agent. Analyze the user's travel request, extract or ask for origin, destination, preferred dates, and cabin class. Then execute the 'flight_search' tool. Provide a crisp, structured summary highlighting the best deal, fastest flight, and carbon-efficient options with a friendly travel advisor tone.`,
+    systemPrompt: `You are the Flight Scout Agent. Analyze the travel request, execute the 'flight_search' tool, and present a structured summary highlighting the best deal, fastest flight, and carbon-efficient options with a friendly travel advisor tone.`,
     tools: ["flight_search"],
     inputs: [
       { id: "origin", label: "Origin City / Airport", type: "text", placeholder: "e.g. Buenos Aires (EZE)", required: true, default: "Buenos Aires (EZE)" },
@@ -18,12 +18,13 @@ const INITIAL_APPS = [
       { id: "cabin_class", label: "Class", type: "select", options: ["economy", "premium_economy", "business"], required: false, default: "economy" }
     ],
     theme: {
-      primaryColor: "#3B82F6",
+      primaryColor: "#38bdf8",
       mode: "dark",
       badge: "Fastest Flights",
       widgetLayout: "card"
     },
     sampleQuery: "Find direct flights from Buenos Aires to Madrid for next month in economy",
+    webhookUrl: "",
     createdAt: "2026-08-30T10:00:00.000Z"
   },
   {
@@ -46,6 +47,7 @@ const INITIAL_APPS = [
       widgetLayout: "card"
     },
     sampleQuery: "What is the time right now in Buenos Aires, London and San Francisco, and when can we sync for a 1-hour meeting?",
+    webhookUrl: "",
     createdAt: "2026-08-30T10:30:00.000Z"
   },
   {
@@ -69,11 +71,12 @@ const INITIAL_APPS = [
       widgetLayout: "card"
     },
     sampleQuery: "Convert 1500 USD to EUR with exchange breakdown",
+    webhookUrl: "",
     createdAt: "2026-08-30T11:00:00.000Z"
   },
   {
     id: "app_lead_qualifier",
-    name: "AI Lead Qualifier & Form Concierge",
+    name: "AI Lead Qualifier & Concierge",
     slug: "lead-qualifier",
     category: "Sales & Growth",
     icon: "Target",
@@ -93,6 +96,7 @@ const INITIAL_APPS = [
       widgetLayout: "floating"
     },
     sampleQuery: "Qualify Apex Logistics for an enterprise agent fleet rollout",
+    webhookUrl: "",
     createdAt: "2026-08-30T11:30:00.000Z"
   }
 ];
@@ -102,8 +106,9 @@ class Store {
     this.apps = new Map(INITIAL_APPS.map(a => [a.id, a]));
     this.apiKeys = new Map();
     this.executionLogs = [];
+    this.sessionMemory = new Map(); // sessionId -> array of conversation turns
     
-    // Seed an initial demo API Key
+    // Seed initial demo API Key
     this.createApiKey("Production Default Key");
   }
 
@@ -117,10 +122,10 @@ class Store {
   }
 
   createApp(data) {
-    const id = `app_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const id = data.id || `app_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const newApp = {
       id,
-      slug: data.slug || data.name.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+      slug: data.slug || (data.name ? data.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") : "mini-app"),
       name: data.name || "Untitled Mini-App",
       category: data.category || "General",
       icon: data.icon || "Sparkles",
@@ -128,9 +133,10 @@ class Store {
       systemPrompt: data.systemPrompt || "You are a helpful AI Agent Mini-App.",
       tools: data.tools || [],
       inputs: data.inputs || [],
-      theme: data.theme || { primaryColor: "#3B82F6", mode: "dark", badge: "AI Mini-App", widgetLayout: "card" },
+      theme: data.theme || { primaryColor: "#38bdf8", mode: "dark", badge: "AI Mini-App", widgetLayout: "card" },
       sampleQuery: data.sampleQuery || "",
-      createdAt: new Date().toISOString()
+      webhookUrl: data.webhookUrl || "",
+      createdAt: data.createdAt || new Date().toISOString()
     };
     this.apps.set(id, newApp);
     return newApp;
@@ -146,6 +152,28 @@ class Store {
 
   deleteApp(id) {
     return this.apps.delete(id);
+  }
+
+  // Session Memory Bank
+  getSessionHistory(sessionId) {
+    if (!sessionId) return [];
+    return this.sessionMemory.get(sessionId) || [];
+  }
+
+  appendSessionTurn(sessionId, userMessage, modelMessage) {
+    if (!sessionId) return;
+    const history = this.getSessionHistory(sessionId);
+    history.push({ role: "user", parts: [{ text: userMessage }] });
+    history.push({ role: "model", parts: [{ text: modelMessage }] });
+    // Keep max 10 turns
+    if (history.length > 20) {
+      history.splice(0, history.length - 20);
+    }
+    this.sessionMemory.set(sessionId, history);
+  }
+
+  clearSession(sessionId) {
+    if (sessionId) this.sessionMemory.delete(sessionId);
   }
 
   // API Keys
@@ -173,7 +201,7 @@ class Store {
 
     return {
       ...record,
-      rawSecret // only returned on creation!
+      rawSecret
     };
   }
 
@@ -232,7 +260,6 @@ class Store {
       : 0;
     const totalTokens = this.executionLogs.reduce((acc, l) => acc + (l.tokensTotal || 0), 0);
 
-    // Group by App
     const appUsage = {};
     for (const log of this.executionLogs) {
       appUsage[log.appName] = (appUsage[log.appName] || 0) + 1;
@@ -244,7 +271,7 @@ class Store {
       avgLatencyMs: avgLatency,
       totalTokens,
       appUsage,
-      recentLogs: this.executionLogs.slice(0, 15)
+      recentLogs: this.executionLogs.slice(0, 20)
     };
   }
 }

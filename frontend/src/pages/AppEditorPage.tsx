@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { fetchAppById, createApp, updateApp, MiniApp, MiniAppInput, executeMiniApp } from '../lib/api';
+import { fetchAppById, createApp, updateApp, MiniApp, MiniAppInput, executeMiniApp, generateMiniAppWithAI } from '../lib/api';
 import { 
   Sparkles, Save, ArrowLeft, Plus, Trash2, Play, 
-  Settings2, Wrench, Palette, Sliders, CheckCircle2 
+  Settings2, Wrench, Palette, Sliders, CheckCircle2, 
+  Wand2, Webhook, Volume2, Mic
 } from 'lucide-react';
 
 const AVAILABLE_TOOLS = [
@@ -34,25 +35,29 @@ export const AppEditorPage: React.FC = () => {
   const [primaryColor, setPrimaryColor] = useState('#38bdf8');
   const [badge, setBadge] = useState('AI Mini-App');
   const [widgetLayout, setWidgetLayout] = useState<'card' | 'floating'>('card');
+  const [webhookUrl, setWebhookUrl] = useState('');
 
   // Simulator State
   const [simInputs, setSimInputs] = useState<Record<string, any>>({});
   const [simRunning, setSimRunning] = useState(false);
   const [simResult, setSimResult] = useState<any>(null);
 
+  // AI Refine Prompt
+  const [aiRefinePrompt, setAiRefinePrompt] = useState('');
+  const [isRefining, setIsRefining] = useState(false);
+
   useEffect(() => {
     if (!isNew && id) {
       loadApp(id);
     } else {
-      // Default template for new app
-      setName('Smart Research Assistant');
-      setSlug('smart-research');
-      setCategory('Research & Analysis');
+      setName('Custom Taskmaster Mini-App');
+      setSlug('custom-taskmaster');
+      setCategory('Productivity');
       setDescription('Autonomous assistant that pulls insights and calculates optimal outputs.');
       setSystemPrompt('You are a concise research agent. Analyze the provided query and generate a crisp briefing.');
       setTools(['world_clock']);
       setInputs([
-        { id: 'topic', label: 'Research Subject / Keyword', type: 'text', placeholder: 'e.g. Autonomous AI Agents', required: true, default: 'Autonomous AI Agents' },
+        { id: 'topic', label: 'Research Topic / Query', type: 'text', placeholder: 'e.g. Autonomous AI Agents', required: true, default: 'Autonomous AI Agents' },
         { id: 'format', label: 'Output Format', type: 'select', options: ['Executive Summary', 'Key Bullet Points', 'Technical Analysis'], required: true, default: 'Executive Summary' }
       ]);
     }
@@ -73,8 +78,8 @@ export const AppEditorPage: React.FC = () => {
       setPrimaryColor(app.theme?.primaryColor || '#38bdf8');
       setBadge(app.theme?.badge || 'AI Mini-App');
       setWidgetLayout(app.theme?.widgetLayout || 'card');
+      setWebhookUrl(app.webhookUrl || '');
 
-      // Initialize sim inputs
       const initSim: Record<string, any> = {};
       app.inputs?.forEach(inp => { initSim[inp.id] = inp.default || ''; });
       setSimInputs(initSim);
@@ -129,6 +134,7 @@ export const AppEditorPage: React.FC = () => {
       systemPrompt,
       tools,
       inputs,
+      webhookUrl,
       theme: {
         primaryColor,
         mode: 'dark',
@@ -167,6 +173,33 @@ export const AppEditorPage: React.FC = () => {
     }
   }
 
+  async function handleAiRefine() {
+    if (!aiRefinePrompt.trim()) return;
+    setIsRefining(true);
+    try {
+      const generated = await generateMiniAppWithAI(aiRefinePrompt.trim());
+      if (generated.name) setName(generated.name);
+      if (generated.description) setDescription(generated.description);
+      if (generated.systemPrompt) setSystemPrompt(generated.systemPrompt);
+      if (generated.inputs) setInputs(generated.inputs as any);
+      if (generated.tools) setTools(generated.tools);
+      if (generated.theme?.primaryColor) setPrimaryColor(generated.theme.primaryColor);
+      setAiRefinePrompt('');
+      alert("App configuration updated with Gemini AI!");
+    } catch (err) {
+      alert("AI synthesis failed");
+    } finally {
+      setIsRefining(false);
+    }
+  }
+
+  function handleSpeak(text: string) {
+    if (!text) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    window.speechSynthesis.speak(utterance);
+  }
+
   if (loading) {
     return <div className="p-8 text-center text-slate-400">Loading Mini-App configuration...</div>;
   }
@@ -187,7 +220,7 @@ export const AppEditorPage: React.FC = () => {
               {isNew ? 'Create New AI Mini-App' : `Edit: ${name}`}
             </h1>
             <p className="text-xs text-slate-400">
-              Configure system prompts, Gemini tool capabilities, input parameters and visual styling
+              Configure system prompts, Gemini tool capabilities, input parameters and webhooks
             </p>
           </div>
         </div>
@@ -206,6 +239,36 @@ export const AppEditorPage: React.FC = () => {
           >
             <Save size={16} />
             <span>{saving ? 'Saving...' : 'Save Configuration'}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* AI Co-Pilot Banner */}
+      <div className="p-4 rounded-2xl bg-gradient-to-r from-indigo-950/80 to-slate-900 border border-indigo-500/30 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0">
+            <Wand2 size={18} />
+          </div>
+          <div>
+            <h3 className="text-xs font-bold text-white">Gemini Mini-App Architect Co-Pilot</h3>
+            <p className="text-[11px] text-slate-300">Type an idea to auto-fill inputs, tools and system prompt with Gemini 3.5 Flash</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 flex-1 max-w-md">
+          <input
+            type="text"
+            placeholder="e.g. Asistente para calcular costos de envío..."
+            value={aiRefinePrompt}
+            onChange={(e) => setAiRefinePrompt(e.target.value)}
+            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-indigo-500"
+          />
+          <button
+            type="button"
+            onClick={handleAiRefine}
+            disabled={isRefining}
+            className="px-3.5 py-1.5 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-white font-bold text-xs shrink-0 disabled:opacity-50 shadow-sm"
+          >
+            {isRefining ? 'Synthesizing...' : 'Refine with AI'}
           </button>
         </div>
       </div>
@@ -366,6 +429,29 @@ export const AppEditorPage: React.FC = () => {
             </div>
           </div>
 
+          {/* Webhooks & Integrations */}
+          <div className="p-6 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-4">
+            <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
+              <Webhook size={18} className="text-amber-400" />
+              <h2 className="font-bold text-base text-white">Outbound Webhooks & Dispatch</h2>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">
+                Webhook URL (Optional)
+              </label>
+              <input
+                type="url"
+                placeholder="https://hooks.slack.com/services/... or https://api.yourdomain.com/events"
+                value={webhookUrl}
+                onChange={(e) => setWebhookUrl(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+              />
+              <p className="text-[11px] text-slate-500 mt-1">
+                Triggered asynchronously when execution finishes, sending inputs and AI results payload.
+              </p>
+            </div>
+          </div>
+
           {/* Theme & Visuals */}
           <div className="p-6 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-4">
             <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
@@ -453,7 +539,13 @@ export const AppEditorPage: React.FC = () => {
               <div className="mt-4 p-4 rounded-xl bg-slate-950 border border-slate-800/80 space-y-3">
                 <div className="flex items-center justify-between text-[11px] text-slate-400 border-b border-slate-800/60 pb-2">
                   <span>Execution Result</span>
-                  <span className="text-emerald-400 font-medium">Tool Executed: {simResult.result?.tool_executed || 'Direct Prompt'}</span>
+                  <button
+                    onClick={() => handleSpeak(simResult.result?.markdown || '')}
+                    className="text-sky-400 hover:text-sky-300 flex items-center gap-1 text-[11px]"
+                  >
+                    <Volume2 size={12} />
+                    <span>Speak</span>
+                  </button>
                 </div>
                 <div className="text-xs text-slate-200 font-sans leading-relaxed whitespace-pre-wrap max-h-60 overflow-y-auto">
                   {simResult.result?.markdown || JSON.stringify(simResult, null, 2)}

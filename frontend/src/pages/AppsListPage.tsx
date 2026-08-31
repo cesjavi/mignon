@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { fetchApps, MiniApp, executeMiniApp } from '../lib/api';
+import { Link, useNavigate } from 'react-router-dom';
+import { fetchApps, MiniApp, executeMiniApp, generateMiniAppWithAI, createApp } from '../lib/api';
 import { 
   Plane, Clock, TrendingUp, Target, Sparkles, 
   Play, Code, Settings, Copy, Check, ArrowRight, 
-  Layers, ShieldCheck, Zap
+  Layers, ShieldCheck, Zap, Wand2, Download, Upload, Volume2
 } from 'lucide-react';
 
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -16,12 +16,18 @@ const ICON_MAP: Record<string, React.ElementType> = {
 };
 
 export const AppsListPage: React.FC = () => {
+  const navigate = useNavigate();
   const [apps, setApps] = useState<MiniApp[]>([]);
   const [loading, setLoading] = useState(true);
   const [testingAppId, setTestingAppId] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<any>(null);
   const [isExecuting, setIsExecuting] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // Prompt-to-App AI Modal
+  const [isAiModalOpen, setIsAiModalOpen] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [isGeneratingAi, setIsGeneratingAi] = useState(false);
 
   useEffect(() => {
     loadApps();
@@ -44,7 +50,6 @@ export const AppsListPage: React.FC = () => {
     setIsExecuting(true);
     setTestResult(null);
 
-    // Build default inputs
     const defaultInputs: Record<string, any> = {};
     app.inputs.forEach((inp) => {
       defaultInputs[inp.id] = inp.default || '';
@@ -67,15 +72,71 @@ export const AppsListPage: React.FC = () => {
     setTimeout(() => setCopiedId(null), 2000);
   }
 
+  function handleSpeakText(text: string) {
+    if (!text) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    window.speechSynthesis.speak(utterance);
+  }
+
+  async function handleGenerateWithAi(e: React.FormEvent) {
+    e.preventDefault();
+    if (!aiPrompt.trim()) return;
+    setIsGeneratingAi(true);
+    try {
+      const schema = await generateMiniAppWithAI(aiPrompt.trim());
+      const created = await createApp(schema);
+      setIsAiModalOpen(false);
+      setAiPrompt('');
+      await loadApps();
+      navigate(`/editor/${created.id}`);
+    } catch (err: any) {
+      alert(`AI Generation error: ${err.message}`);
+    } finally {
+      setIsGeneratingAi(false);
+    }
+  }
+
+  function handleExportAppsJson() {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(apps, null, 2));
+    const dlAnchorElem = document.createElement('a');
+    dlAnchorElem.setAttribute("href", dataStr);
+    dlAnchorElem.setAttribute("download", "mignon-mini-apps-catalog.json");
+    dlAnchorElem.click();
+  }
+
+  function handleImportAppsJson(e: React.ChangeEvent<HTMLInputElement>) {
+    const fileReader = new FileReader();
+    if (e.target.files && e.target.files[0]) {
+      fileReader.readAsText(e.target.files[0], "UTF-8");
+      fileReader.onload = async (event) => {
+        try {
+          const parsed = JSON.parse(event.target?.result as string);
+          if (Array.isArray(parsed)) {
+            for (const item of parsed) {
+              await createApp(item);
+            }
+          } else {
+            await createApp(parsed);
+          }
+          await loadApps();
+          alert("Mini-Apps imported successfully!");
+        } catch (err) {
+          alert("Invalid JSON file");
+        }
+      };
+    }
+  }
+
   return (
     <div className="space-y-8">
       {/* Header Banner */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border border-slate-800 p-8">
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border border-slate-800 p-8 shadow-2xl">
         <div className="absolute top-0 right-0 w-96 h-96 bg-sky-500/10 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20"></div>
-        <div className="max-w-3xl space-y-3 relative z-10">
+        <div className="max-w-3xl space-y-4 relative z-10">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-500/10 border border-sky-500/20 text-sky-400 text-xs font-semibold">
             <Zap size={13} />
-            <span>Autonomous Micro-Agent Fleet</span>
+            <span>Autonomous Micro-Agent Fleet & Voice Widgets</span>
           </div>
           <h1 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
             Mini-Apps & AI Agent Widgets
@@ -84,6 +145,40 @@ export const AppsListPage: React.FC = () => {
             Create, test and deploy intelligent single-purpose micro-agents powered by <strong className="text-white">Gemini 3.5 Flash</strong>. 
             Embed them in any website with a single <code className="text-sky-300 bg-sky-950/60 px-1.5 py-0.5 rounded border border-sky-800/40">&lt;script&gt;</code> tag or access them via direct REST API endpoints.
           </p>
+
+          <div className="flex flex-wrap items-center gap-3 pt-2">
+            <button
+              onClick={() => setIsAiModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-sky-400 via-indigo-500 to-purple-600 hover:opacity-95 text-slate-950 font-extrabold text-xs shadow-lg shadow-indigo-500/25 transition-all transform hover:-translate-y-0.5"
+            >
+              <Wand2 size={16} />
+              <span>Prompt-to-App (Create with AI)</span>
+            </button>
+
+            <Link
+              to="/editor/new"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs border border-slate-700 transition-colors"
+            >
+              <span>+ Manual Builder</span>
+            </Link>
+
+            <div className="flex items-center gap-2 ml-auto">
+              <button
+                onClick={handleExportAppsJson}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-white text-xs transition-colors"
+                title="Export Mini-Apps JSON"
+              >
+                <Download size={14} />
+                <span>Export JSON</span>
+              </button>
+
+              <label className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-white text-xs cursor-pointer transition-colors">
+                <Upload size={14} />
+                <span>Import JSON</span>
+                <input type="file" accept=".json" onChange={handleImportAppsJson} className="hidden" />
+              </label>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -205,6 +300,72 @@ export const AppsListPage: React.FC = () => {
         )}
       </div>
 
+      {/* Prompt-to-App AI Modal */}
+      {isAiModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-slate-900 border border-indigo-500/40 rounded-2xl p-6 space-y-4 shadow-2xl animate-in fade-in">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2 text-sky-400 font-bold">
+                <Wand2 size={20} />
+                <span className="text-base text-white">Prompt-to-App Architect</span>
+              </div>
+              <button onClick={() => setIsAiModalOpen(false)} className="text-slate-400 hover:text-white text-sm">✕</button>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Describe in natural language what your micro-agent widget should do. Gemini 3.5 Flash will automatically engineer the input fields, system instructions, tools, and UI theme.
+            </p>
+
+            <form onSubmit={handleGenerateWithAi} className="space-y-4">
+              <textarea
+                value={aiPrompt}
+                onChange={(e) => setAiPrompt(e.target.value)}
+                placeholder="e.g. Un cotizador de envíos internacionales que pida país de origen, destino y peso en kg, calcule tarifas estimadas y recomiende opciones express."
+                rows={4}
+                required
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3.5 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-sky-500"
+              />
+
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-slate-400">Try presets:</span>
+                <button
+                  type="button"
+                  onClick={() => setAiPrompt("Calculadora inteligente de presupuestos para proyectos de desarrollo de software con desglose de horas y stack tecnológico")}
+                  className="text-[11px] text-sky-400 bg-sky-950/60 px-2 py-1 rounded border border-sky-800/40 hover:bg-sky-900/60"
+                >
+                  Software Quote
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAiPrompt("Asistente de reserva y cotización de paquetes turísticos con hotel y actividades")}
+                  className="text-[11px] text-indigo-400 bg-indigo-950/60 px-2 py-1 rounded border border-indigo-800/40 hover:bg-indigo-900/60"
+                >
+                  Travel Planner
+                </button>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsAiModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 text-xs font-semibold text-slate-300 hover:bg-slate-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isGeneratingAi}
+                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-sky-400 to-indigo-600 hover:from-sky-300 hover:to-indigo-500 text-slate-950 font-bold text-xs shadow-lg disabled:opacity-50 flex items-center gap-2"
+                >
+                  <Sparkles size={14} />
+                  <span>{isGeneratingAi ? 'Synthesizing Mini-App...' : 'Generate with Gemini'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Quick Test Modal / Drawer */}
       {testingAppId && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
@@ -238,6 +399,17 @@ export const AppsListPage: React.FC = () => {
               </div>
             ) : testResult ? (
               <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-400">Agent Reasoning Output</span>
+                  <button
+                    onClick={() => handleSpeakText(testResult.result?.markdown || '')}
+                    className="flex items-center gap-1.5 text-xs text-sky-400 bg-sky-950/60 px-2.5 py-1 rounded-lg border border-sky-800/40 hover:bg-sky-900/60"
+                  >
+                    <Volume2 size={13} />
+                    <span>Listen Voice</span>
+                  </button>
+                </div>
+
                 <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 font-sans text-sm text-slate-200 whitespace-pre-wrap leading-relaxed max-h-72 overflow-y-auto">
                   {testResult.result?.markdown || JSON.stringify(testResult, null, 2)}
                 </div>

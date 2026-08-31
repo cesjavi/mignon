@@ -1,9 +1,10 @@
 import { executeTool, TOOLS_SCHEMA } from "../tools/index.js";
+import { store } from "./store.js";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash";
 
-export async function runAgentWithTools({ app, userQuery, inputValues = {} }) {
+export async function runAgentWithTools({ app, userQuery, inputValues = {}, sessionId = null }) {
   const startTime = Date.now();
   
   // Format the comprehensive input prompt
@@ -12,7 +13,12 @@ export async function runAgentWithTools({ app, userQuery, inputValues = {} }) {
     .map(([k, v]) => `- ${k}: ${v}`)
     .join("\n");
 
-  const fullPrompt = `${userQuery || "Please process this request."}\n\nUser Input Parameters:\n${inputEntries || "(None provided)"}`;
+  const fullPrompt = userQuery 
+    ? (inputEntries ? `${userQuery}\n\nParameters:\n${inputEntries}` : userQuery)
+    : `Please process this request with parameters:\n${inputEntries || "(None provided)"}`;
+
+  // Session history if multi-turn session
+  const history = sessionId ? store.getSessionHistory(sessionId) : [];
 
   // Check if we can run via official Google Gemini endpoint
   if (GEMINI_API_KEY) {
@@ -21,10 +27,17 @@ export async function runAgentWithTools({ app, userQuery, inputValues = {} }) {
         model: GEMINI_MODEL,
         systemInstruction: app.systemPrompt,
         prompt: fullPrompt,
-        allowedTools: app.tools
+        allowedTools: app.tools,
+        history
       });
 
       const latencyMs = Date.now() - startTime;
+
+      // Save to memory bank
+      if (sessionId && response.text) {
+        store.appendSessionTurn(sessionId, fullPrompt, response.text);
+      }
+
       return {
         ...response,
         latencyMs,
@@ -43,6 +56,11 @@ export async function runAgentWithTools({ app, userQuery, inputValues = {} }) {
   });
 
   const latencyMs = Date.now() - startTime;
+
+  if (sessionId && simulatedResult.text) {
+    store.appendSessionTurn(sessionId, fullPrompt, simulatedResult.text);
+  }
+
   return {
     ...simulatedResult,
     latencyMs,
@@ -51,17 +69,20 @@ export async function runAgentWithTools({ app, userQuery, inputValues = {} }) {
 }
 
 // Google Gemini API live execution with tool function declarations
-async function executeGeminiLive({ model, systemInstruction, prompt, allowedTools = [] }) {
+async function executeGeminiLive({ model, systemInstruction, prompt, allowedTools = [], history = [] }) {
   const selectedToolsSchema = TOOLS_SCHEMA.filter(t => allowedTools.includes(t.name));
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
 
+  const contents = [
+    ...history,
+    {
+      role: "user",
+      parts: [{ text: prompt }]
+    }
+  ];
+
   const requestBody = {
-    contents: [
-      {
-        role: "user",
-        parts: [{ text: prompt }]
-      }
-    ],
+    contents,
     systemInstruction: systemInstruction ? {
       parts: [{ text: systemInstruction }]
     } : undefined,
@@ -107,7 +128,7 @@ async function executeGeminiLive({ model, systemInstruction, prompt, allowedTool
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contents: [
-          { role: "user", parts: [{ text: prompt }] },
+          ...contents,
           candidate.content,
           {
             role: "user",
@@ -129,7 +150,6 @@ async function executeGeminiLive({ model, systemInstruction, prompt, allowedTool
       const followUpData = await toolFollowUpRes.json();
       finalResponseText = followUpData.candidates?.[0]?.content?.parts?.find(p => p.text)?.text || "";
     } else {
-      // If follow-up text is empty, format clean markdown from toolResults directly
       finalResponseText = formatFallbackMarkdown(functionCall.name, toolResults);
     }
   } else {
@@ -142,6 +162,100 @@ async function executeGeminiLive({ model, systemInstruction, prompt, allowedTool
     toolExecuted: functionCall ? functionCall.name : null,
     toolResults,
     tokensTotal: (data.usageMetadata?.totalTokenCount || 280)
+  };
+}
+
+// "Prompt-to-App" generator using Gemini structured output
+export async function generateMiniAppWithGemini({ userIdea }) {
+  if (!GEMINI_API_KEY) {
+    return generateFallbackAppSchema(userIdea);
+  }
+
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+  
+  const systemPrompt = `You are the Mignon Architect Agent. You design autonomous AI Mini-Apps based on user requirements.
+Return ONLY valid JSON matching this exact structure:
+{
+  "name": "Short, catchy App Name",
+  "slug": "app-slug",
+  "category": "Productivity | Travel | Finance | Sales | Health | Logistics | General",
+  "icon": "Sparkles | Plane | Clock | TrendingUp | Target",
+  "description": "Clear 1-2 sentence description of what the autonomous agent widget does.",
+  "systemPrompt": "Detailed instructions for the Gemini agent persona, tone, and formatting.",
+  "tools": ["world_clock" or "flight_search" or "currency_converter" or "lead_qualifier"],
+  "inputs": [
+    { "id": "param1", "label": "Label 1", "type": "text | number | date | select | textarea", "placeholder": "Example", "required": true, "default": "Default Value" }
+  ],
+  "theme": {
+    "primaryColor": "#38bdf8 (or any vibrant hex color)",
+    "mode": "dark",
+    "badge": "Badge text",
+    "widgetLayout": "card or floating"
+  },
+  "sampleQuery": "An example query to test the app"
+}`;
+
+  try {
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: `Create a comprehensive Mini-App for this idea: "${userIdea}"` }] }],
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        generationConfig: {
+          temperature: 0.3,
+          responseMimeType: "application/json"
+        }
+      })
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      const parsed = JSON.parse(rawText);
+      return parsed;
+    }
+  } catch (err) {
+    console.warn("AI Generator notice:", err.message);
+  }
+
+  return generateFallbackAppSchema(userIdea);
+}
+
+function generateFallbackAppSchema(userIdea) {
+  const clean = userIdea.toLowerCase();
+  if (clean.includes("crypto") || clean.includes("coin") || clean.includes("invest")) {
+    return {
+      name: "Crypto & Market Sentinel",
+      slug: "crypto-sentinel",
+      category: "Finance",
+      icon: "TrendingUp",
+      description: "Monitors asset rates, volatility and calculates profit/loss benchmarks.",
+      systemPrompt: "You are the Crypto Sentinel Agent. Evaluate the requested coin/token against fiat rates and provide risk-adjusted insight.",
+      tools: ["currency_converter"],
+      inputs: [
+        { id: "amount", label: "Holding Amount", type: "number", placeholder: "1000", required: true, default: "5000" },
+        { id: "from_currency", label: "From Currency", type: "text", placeholder: "USD", required: true, default: "USD" },
+        { id: "to_currency", label: "Target Fiat/Stablecoin", type: "text", placeholder: "EUR", required: true, default: "EUR" }
+      ],
+      theme: { primaryColor: "#10B981", mode: "dark", badge: "Crypto Radar", widgetLayout: "card" },
+      sampleQuery: "Evaluate 5000 USD portfolio conversion into EUR"
+    };
+  }
+  return {
+    name: "Autonomous Smart Assistant",
+    slug: "smart-assistant",
+    category: "Productivity",
+    icon: "Sparkles",
+    description: `Autonomous agent tailored for: ${userIdea}`,
+    systemPrompt: `You are an expert AI assistant dedicated to ${userIdea}. Provide concise, actionable insights and structured data.`,
+    tools: ["world_clock"],
+    inputs: [
+      { id: "goal", label: "Primary Objective", type: "text", placeholder: "What to calculate or analyze", required: true, default: userIdea },
+      { id: "notes", label: "Additional Context", type: "textarea", placeholder: "Optional notes", required: false, default: "" }
+    ],
+    theme: { primaryColor: "#38bdf8", mode: "dark", badge: "AI Mini-App", widgetLayout: "card" },
+    sampleQuery: `Execute analysis for ${userIdea}`
   };
 }
 

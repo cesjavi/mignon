@@ -27,6 +27,7 @@ export interface MiniApp {
   inputs: MiniAppInput[];
   theme: MiniAppTheme;
   sampleQuery?: string;
+  webhookUrl?: string;
   createdAt: string;
   updatedAt?: string;
 }
@@ -91,6 +92,17 @@ export async function createApp(data: Partial<MiniApp>): Promise<MiniApp> {
   return json.data;
 }
 
+export async function generateMiniAppWithAI(prompt: string): Promise<Partial<MiniApp>> {
+  const res = await fetch(`${API_BASE}/apps/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt }),
+  });
+  if (!res.ok) throw new Error('Failed to generate app with AI');
+  const json = await res.json();
+  return json.data;
+}
+
 export async function updateApp(id: string, updates: Partial<MiniApp>): Promise<MiniApp> {
   const res = await fetch(`${API_BASE}/apps/${id}`, {
     method: 'PUT',
@@ -107,7 +119,7 @@ export async function deleteApp(id: string): Promise<void> {
   if (!res.ok) throw new Error('Failed to delete app');
 }
 
-export async function executeMiniApp(id: string, inputs: Record<string, any>, apiKey?: string) {
+export async function executeMiniApp(id: string, inputs: Record<string, any>, apiKey?: string, sessionId?: string) {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (apiKey) {
     headers['Authorization'] = `Bearer ${apiKey.trim()}`;
@@ -115,7 +127,7 @@ export async function executeMiniApp(id: string, inputs: Record<string, any>, ap
   const res = await fetch(`${API_BASE}/apps/${id}/run`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ inputs }),
+    body: JSON.stringify({ inputs, sessionId }),
   });
   if (!res.ok) {
     const err = await res.json();
