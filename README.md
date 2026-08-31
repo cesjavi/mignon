@@ -1,9 +1,14 @@
 # Mignon - Autonomous AI Mini-Apps & Agent Widget Engine
 
-> **Submitted to:** Google "All Things Agentic" Hackathon  
-> **Track:** *The Taskmaster* (Autonomous action workflows) & *Fortified Enterprise Fleet* (Registry, SHA-256 API Gateways & Telemetry)  
-> **Core AI:** Google Gemini 3.5 / 2.5 Flash via Google GenAI SDK & Tool Use  
-> **Cloud Infrastructure:** Google Cloud Run (Containerized Microservice)
+[![Google Cloud Run](https://img.shields.io/badge/Google%20Cloud-Cloud%20Run-4285F4?style=for-the-badge&logo=googlecloud&logoColor=white)](https://mignon-platform-526192292529.us-central1.run.app/)
+[![Gemini 3.5 Flash](https://img.shields.io/badge/Google%20AI-Gemini%203.5%20Flash-8E75FF?style=for-the-badge&logo=google&logoColor=white)](https://ai.google.dev/)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Active-10B981?style=for-the-badge&logo=googlechrome&logoColor=white)](https://mignon-platform-526192292529.us-central1.run.app/demo.html)
+
+> **Live Deployment URL:** [https://mignon-platform-526192292529.us-central1.run.app/](https://mignon-platform-526192292529.us-central1.run.app/)  
+> **Interactive Widgets Showcase:** [https://mignon-platform-526192292529.us-central1.run.app/demo.html](https://mignon-platform-526192292529.us-central1.run.app/demo.html)  
+> **GitHub Repository:** [https://github.com/cesjavi/mignon](https://github.com/cesjavi/mignon)  
+> **Target Tracks:** *The Taskmaster* (Autonomous action workflows) & *The Fortified Enterprise Fleet* (Registry, SHA-256 Gateways & Telemetry)  
+> **Core AI:** Google Gemini 3.5 Flash with Native Function Calling & Multi-turn Memory
 
 ---
 
