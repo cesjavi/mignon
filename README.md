@@ -123,6 +123,83 @@ gcloud run deploy mignon-agent-platform \
 
 ---
 
+---
+
+## 🧪 Reproducible Testing & Evaluation Guide (For Judges & Evaluators)
+
+Mignon is designed for 100% reproducible testing. Evaluators can test the system through the **live cloud deployment**, **direct API verification**, or **local spin-up**.
+
+### 🌟 Option 1: Instant Zero-Setup Live Testing (Recommended)
+
+No installation or API keys required — all endpoints, tools, and widgets are active 24/7 on Google Cloud Run:
+
+1. **Test Autonomous Tool Calling & Mini-Apps:**
+   - Navigate to [Live Studio](https://mignon-platform-526192292529.us-central1.run.app/)
+   - Click **"Quick Test"** on *Flight Scout & Fare Radar* (executes Gemini flight search tools).
+   - Click the **Speaker icon (🔊)** to test the Web Speech Voice Synthesis (TTS).
+2. **Test 1-Line Embeddable Widgets & Anti-Spam Cooldown:**
+   - Open the [Interactive Widgets Showcase](https://mignon-platform-526192292529.us-central1.run.app/demo.html).
+   - Trigger the *Flight Scout* or *Global Meeting Sync* widget.
+   - Click the submit button rapidly twice to observe the **3-second anti-spam cooldown protection** (`⏳ Cooldown (3s)...`).
+3. **Test Real-Time Telemetry & Observability:**
+   - Visit the [Observability Dashboard](https://mignon-platform-526192292529.us-central1.run.app/analytics).
+   - Click **"Simulate Traffic"** to generate dynamic requests. Watch the timeline chart, $P_{95}$ latency distributions, and live Gemini token counters update in real-time.
+   - Click any row in the **Audit Stream** to inspect the raw JSON execution traces.
+4. **Test "Prompt-to-App" AI Generator:**
+   - In the Studio, click **"Prompt-to-App (Create with AI)"**.
+   - Enter a prompt (e.g., *"A crypto gas fee estimator agent"*) and watch Gemini generate the structured JSON schema and tool bindings.
+
+---
+
+### 💻 Option 2: Automated API Verification (cURL / Terminal)
+
+You can verify the backend API, Gemini function calling, and rate-limiting directly via terminal:
+
+#### 1. Verify Health & Agent Engine Status
+```bash
+curl -X GET "https://mignon-platform-526192292529.us-central1.run.app/health"
+```
+*Expected Output:* `{"status":"healthy","service":"Mignon Agent Engine","engine":"Gemini 2.5 Flash / 3.5 Flash",...}`
+
+#### 2. Execute an Autonomous Mini-App (Flight Scout with Tool Execution)
+```bash
+curl -X POST "https://mignon-platform-526192292529.us-central1.run.app/api/v1/apps/app_flight_scout/run" \
+  -H "Content-Type: application/json" \
+  -d '{"inputs":{"origin":"Buenos Aires (EZE)","destination":"Madrid (MAD)"}}'
+```
+
+#### 3. Test Anti-Spam Burst Cooldown (HTTP 429)
+Execute the previous request twice within 3 seconds:
+*Expected Output:* `HTTP 429 Too Many Requests` with payload `{"error":"COOLDOWN_ACTIVE","message":"Anti-spam burst limit active. Please wait..."}`
+
+#### 4. Test SHA-256 API Key Creation & Quotas
+```bash
+curl -X POST "https://mignon-platform-526192292529.us-central1.run.app/api/v1/keys" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Evaluator Key","rateLimit":50}'
+```
+
+---
+
+### 🐳 Option 3: Local Containerized Spin-Up (Docker)
+
+To run the entire unified stack locally in a single container:
+
+```bash
+# 1. Clone repository
+git clone https://github.com/cesjavi/mignon.git
+cd mignon
+
+# 2. Build Docker container
+docker build -t mignon-app .
+
+# 3. Run container locally
+docker run -p 8080:8080 -e GEMINI_API_KEY="your_api_key_or_leave_blank_for_simulator" mignon-app
+```
+*Access the local instance at:* `http://localhost:8080`
+
+---
+
 ## 🏆 Hackathon Checklist Compliance
 
 - [x] **Track:** The Taskmaster & Enterprise Fleet (Autonomous action, micro-tools, telemetry)
@@ -132,3 +209,5 @@ gcloud run deploy mignon-agent-platform \
 - [x] **Security & Zero-Trust:** API Keys secured with SHA-256 cryptographic hashing & revocation
 - [x] **Developer Experience:** Complete Developer Portal with cURL, Python, JS snippets and Try-It console
 - [x] **Embed Artifact:** Isolated Shadow DOM Web Component widget
+- [x] **Reproducible Testing:** Complete step-by-step verification guide with live URLs and cURL commands
+
