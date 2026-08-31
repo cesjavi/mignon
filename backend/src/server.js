@@ -24,9 +24,11 @@ app.use(cors({
 
 app.use(express.json());
 
-// Serve static widget bundle if requested
+// Serve static widget bundle and demo assets
 app.use(express.static(path.join(__dirname, "../../widget/dist")));
-app.use("/public", express.static(path.join(__dirname, "../../widget/public")));
+app.use("/widget.js", express.static(path.join(__dirname, "../../widget/dist/widget.js")));
+app.use("/demo.html", express.static(path.join(__dirname, "../../frontend/public/demo.html")));
+app.use(express.static(path.join(__dirname, "../../frontend/dist")));
 
 // API Routes
 app.use("/api/v1/apps", appsRouter);
@@ -42,6 +44,16 @@ app.get("/health", (req, res) => {
     engine: "Gemini 2.5 Flash / 3.5 Flash",
     uptime: process.uptime(),
     timestamp: new Date().toISOString()
+  });
+});
+
+// SPA catch-all fallback for frontend routes (e.g. /apps/new, /embed, /keys)
+app.get("*", (req, res) => {
+  const indexPath = path.join(__dirname, "../../frontend/dist/index.html");
+  res.sendFile(indexPath, (err) => {
+    if (err) {
+      res.status(200).send(`Mignon Engine API Active. Access /api/v1/apps or run frontend locally.`);
+    }
   });
 });
 
