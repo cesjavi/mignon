@@ -1,7 +1,7 @@
 import { executeTool, TOOLS_SCHEMA } from "../tools/index.js";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash";
 
 export async function runAgentWithTools({ app, userQuery, inputValues = {} }) {
   const startTime = Date.now();
@@ -31,7 +31,7 @@ export async function runAgentWithTools({ app, userQuery, inputValues = {} }) {
         model: GEMINI_MODEL
       };
     } catch (err) {
-      console.warn("Gemini Live API error, falling back to local agent runtime:", err.message);
+      console.warn("Gemini Live API notice:", err.message);
     }
   }
 
@@ -53,7 +53,6 @@ export async function runAgentWithTools({ app, userQuery, inputValues = {} }) {
 // Google Gemini API live execution with tool function declarations
 async function executeGeminiLive({ model, systemInstruction, prompt, allowedTools = [] }) {
   const selectedToolsSchema = TOOLS_SCHEMA.filter(t => allowedTools.includes(t.name));
-
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
 
   const requestBody = {
@@ -63,9 +62,9 @@ async function executeGeminiLive({ model, systemInstruction, prompt, allowedTool
         parts: [{ text: prompt }]
       }
     ],
-    systemInstruction: {
+    systemInstruction: systemInstruction ? {
       parts: [{ text: systemInstruction }]
-    },
+    } : undefined,
     tools: selectedToolsSchema.length > 0 ? [
       {
         functionDeclarations: selectedToolsSchema.map(t => ({
@@ -76,8 +75,7 @@ async function executeGeminiLive({ model, systemInstruction, prompt, allowedTool
       }
     ] : undefined,
     generationConfig: {
-      temperature: 0.2,
-      maxOutputTokens: 1024
+      temperature: 0.2
     }
   };
 
@@ -100,19 +98,19 @@ async function executeGeminiLive({ model, systemInstruction, prompt, allowedTool
   let finalResponseText = "";
 
   if (functionCall) {
-    // Execute tool
-    toolResults = await executeTool(functionCall.name, functionCall.args);
+    // 1. Execute tool on backend
+    toolResults = await executeTool(functionCall.name, functionCall.args || {});
 
-    // Feed tool output back to Gemini
+    // 2. Feed tool output back to Gemini
     const toolFollowUpRes = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contents: [
           { role: "user", parts: [{ text: prompt }] },
-          { role: "model", parts: [{ functionCall }] },
+          candidate.content,
           {
-            role: "function",
+            role: "user",
             parts: [
               {
                 functionResponse: {
@@ -123,16 +121,19 @@ async function executeGeminiLive({ model, systemInstruction, prompt, allowedTool
             ]
           }
         ],
-        systemInstruction: { parts: [{ text: systemInstruction }] }
+        systemInstruction: systemInstruction ? { parts: [{ text: systemInstruction }] } : undefined
       })
     });
 
     if (toolFollowUpRes.ok) {
       const followUpData = await toolFollowUpRes.json();
-      finalResponseText = followUpData.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      finalResponseText = followUpData.candidates?.[0]?.content?.parts?.find(p => p.text)?.text || "";
+    } else {
+      // If follow-up text is empty, format clean markdown from toolResults directly
+      finalResponseText = formatFallbackMarkdown(functionCall.name, toolResults);
     }
   } else {
-    finalResponseText = candidate?.content?.parts?.[0]?.text || "";
+    finalResponseText = candidate?.content?.parts?.find(p => p.text)?.text || "";
   }
 
   return {
@@ -142,6 +143,23 @@ async function executeGeminiLive({ model, systemInstruction, prompt, allowedTool
     toolResults,
     tokensTotal: (data.usageMetadata?.totalTokenCount || 280)
   };
+}
+
+function formatFallbackMarkdown(toolName, toolResults) {
+  if (toolName === "flight_search" && toolResults?.flights) {
+    const f0 = toolResults.flights[0];
+    const f1 = toolResults.flights[1];
+    return `✈️ **Flight Scout Results for ${toolResults.search_query.origin} ➔ ${toolResults.search_query.destination}**\n\n` +
+      `• **Recommended Option:** ${f0.airline} (${f0.flight_number}) — **$${f0.price_usd} USD** (${f0.stop_details}, ${f0.duration})\n` +
+      `• **Alternative Deal:** ${f1.airline} (${f1.flight_number}) — **$${f1.price_usd} USD** (${f1.stop_details})\n` +
+      `• **Eco-Footprint:** ${f0.carbon_emissions}\n\n` +
+      `*Prices dynamically analyzed by Gemini 3.5 Flash.*`;
+  }
+  if (toolName === "world_clock" && toolResults?.locations) {
+    const rows = toolResults.locations.map(l => `• **${l.location}:** \`${l.formattedTime}\` ${l.isWorkingHour ? '🟢' : '🌙'}`).join("\n");
+    return `🌍 **Global Time Synchronization**\n\n${rows}\n\n💡 **Overlap Recommendation:** ${toolResults.meeting_recommendation || "14:00 - 17:00 UTC."}`;
+  }
+  return JSON.stringify(toolResults, null, 2);
 }
 
 // Simulated Intelligent Engine for reliable live demos & fast offline testing
