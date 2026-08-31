@@ -290,22 +290,99 @@
           cursor: not-allowed;
         }
         .result-box {
-          padding: 14px;
-          background: #040711;
-          border: 1px solid #1e293b;
-          border-radius: 12px;
+          padding: 16px;
+          background: linear-gradient(180deg, #090e1c 0%, #030712 100%);
+          border: 1px solid rgba(56, 189, 248, 0.25);
+          border-radius: 14px;
+          box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
           display: ${isAutoRun ? 'block' : 'none'};
         }
-        .result-box.active { display: block; animation: fadeIn 0.2s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .result-box.active { display: block; animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
         
         .result-text {
-          font-size: 13.5px;
-          line-height: 1.55;
+          font-size: 13px;
+          line-height: 1.6;
           color: #e2e8f0;
-          white-space: pre-wrap;
           font-family: ${app.slug?.includes("fortune") ? "'JetBrains Mono', monospace" : "inherit"};
         }
+
+        /* Beautiful Markdown Styling */
+        .md-h1, .md-h2 {
+          font-size: 14px;
+          font-weight: 800;
+          color: #ffffff;
+          margin: 10px 0 6px 0;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .md-h3 {
+          font-size: 11.5px;
+          font-weight: 700;
+          color: #38bdf8;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          background: rgba(56, 189, 248, 0.1);
+          border: 1px solid rgba(56, 189, 248, 0.25);
+          padding: 3px 8px;
+          border-radius: 6px;
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          margin: 12px 0 6px 0;
+        }
+        .md-h3:first-child { margin-top: 0; }
+        .md-bold { font-weight: 700; color: #ffffff; }
+        .md-italic { color: #cbd5e1; font-style: italic; }
+        .md-code {
+          background: #0f172a;
+          border: 1px solid #1e293b;
+          color: #38bdf8;
+          padding: 2px 6px;
+          border-radius: 5px;
+          font-family: 'JetBrains Mono', monospace;
+          font-size: 11.5px;
+        }
+        .md-quote {
+          background: rgba(56, 189, 248, 0.06);
+          border-left: 3px solid #38bdf8;
+          padding: 8px 12px;
+          border-radius: 0 8px 8px 0;
+          margin: 8px 0;
+          color: #e2e8f0;
+          font-size: 12.5px;
+          font-style: italic;
+        }
+        .md-hr {
+          border: 0;
+          height: 1px;
+          background: linear-gradient(90deg, transparent, rgba(51, 65, 85, 0.8), transparent);
+          margin: 12px 0;
+        }
+        .md-ul {
+          list-style: none;
+          padding: 0;
+          margin: 6px 0;
+          display: flex;
+          flex-direction: column;
+          gap: 5px;
+        }
+        .md-li {
+          display: flex;
+          align-items: flex-start;
+          gap: 7px;
+          line-height: 1.5;
+          color: #e2e8f0;
+          font-size: 12.5px;
+        }
+        .md-bullet {
+          color: #38bdf8;
+          font-size: 9px;
+          margin-top: 4px;
+          flex-shrink: 0;
+        }
+        .md-spacer { height: 8px; }
 
         .quota-banner {
           background: rgba(239, 68, 68, 0.15);
@@ -333,11 +410,12 @@
           border: 1px solid #334155;
           color: #cbd5e1;
           font-size: 11px;
-          padding: 3px 7px;
+          padding: 4px 8px;
           border-radius: 6px;
           cursor: pointer;
+          transition: all 0.15s ease;
         }
-        .mini-btn:hover { background: #334155; color: #fff; }
+        .mini-btn:hover { background: #334155; color: #fff; transform: translateY(-1px); }
         .mini-btn:disabled { opacity: 0.5; cursor: not-allowed; }
       </style>
 
@@ -482,11 +560,48 @@
           }
         }
 
+  function formatMarkdownToHtml(markdown) {
+    if (!markdown) return "";
+    let html = markdown
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+
+    // Headers
+    html = html.replace(/^### (.*$)/gim, '<h4 class="md-h3">$1</h4>');
+    html = html.replace(/^## (.*$)/gim, '<h3 class="md-h2">$1</h3>');
+    html = html.replace(/^# (.*$)/gim, '<h2 class="md-h1">$1</h2>');
+
+    // Blockquotes
+    html = html.replace(/^&gt; (.*$)/gim, '<blockquote class="md-quote">$1</blockquote>');
+
+    // Horizontal Rules
+    html = html.replace(/^---$/gim, '<hr class="md-hr" />');
+
+    // Bold & Italic
+    html = html.replace(/\*\*\*(.*?)\*\*\*/g, '<strong class="md-bold"><em class="md-italic">$1</em></strong>');
+    html = html.replace(/\*\*(.*?)\*\*/g, '<strong class="md-bold">$1</strong>');
+    html = html.replace(/\*(.*?)\*/g, '<em class="md-italic">$1</em>');
+
+    // Inline Code
+    html = html.replace(/\`([^`]+)\`/g, '<code class="md-code">$1</code>');
+
+    // Bullet Lists
+    html = html.replace(/^[\*\-\•]\s+(.*$)/gim, '<li class="md-li"><span class="md-bullet">✦</span> <span>$1</span></li>');
+    html = html.replace(/((<li class="md-li">.*<\/li>\s*)+)/gim, '<ul class="md-ul">$1</ul>');
+
+    // Spacers and breaks
+    html = html.replace(/\n\n/g, '<div class="md-spacer"></div>');
+    html = html.replace(/\n/g, '<br/>');
+
+    return html;
+  }
+
         if (!res.ok) {
           throw new Error(data.error || "Execution returned an error");
         }
 
-        resultContent.innerText = data.result?.markdown || "Execution complete.";
+        resultContent.innerHTML = formatMarkdownToHtml(data.result?.markdown || "Execution complete.");
         if (resultBox) resultBox.classList.add("active");
 
         // Read remaining and cooldown headers
@@ -517,7 +632,7 @@
           if (refreshBtn) refreshBtn.disabled = false;
         }
       } catch (err) {
-        resultContent.innerText = `⚠️ Error: ${err.message}`;
+        resultContent.innerHTML = `<div style="color: #f87171; font-weight: 600;">⚠️ Error: ${err.message}</div>`;
         if (resultBox) resultBox.classList.add("active");
         if (submitBtn && !isQuotaExceeded) {
           submitBtn.disabled = false;

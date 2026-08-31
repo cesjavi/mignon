@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { fetchApps, MiniApp, executeMiniApp, generateMiniAppWithAI, createApp } from '../lib/api';
+import { MarkdownOutput } from '../components/MarkdownOutput';
 import { 
   Plane, Clock, TrendingUp, Target, Sparkles, 
   Play, Code, Settings, Copy, Check, ArrowRight, 
@@ -486,8 +487,14 @@ export const AppsListPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 font-sans text-sm text-slate-200 whitespace-pre-wrap leading-relaxed max-h-72 overflow-y-auto">
-                  {testResult.result?.markdown || JSON.stringify(testResult, null, 2)}
+                <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 font-sans text-sm text-slate-200 leading-relaxed max-h-80 overflow-y-auto pr-1">
+                  {testResult.result?.markdown ? (
+                    <MarkdownOutput content={testResult.result.markdown} />
+                  ) : (
+                    <div className="whitespace-pre-wrap font-mono text-xs">
+                      {JSON.stringify(testResult, null, 2)}
+                    </div>
+                  )}
                 </div>
 
                 {testResult.metadata && (

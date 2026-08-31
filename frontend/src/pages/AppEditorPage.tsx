@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { fetchAppById, createApp, updateApp, MiniApp, MiniAppInput, executeMiniApp, generateMiniAppWithAI } from '../lib/api';
+import { MarkdownOutput } from '../components/MarkdownOutput';
 import { 
   Sparkles, Save, ArrowLeft, Plus, Trash2, Play, 
   Settings2, Wrench, Palette, Sliders, CheckCircle2, 
@@ -654,8 +655,14 @@ export const AppEditorPage: React.FC = () => {
                     <span>Speak</span>
                   </button>
                 </div>
-                <div className="text-xs text-slate-200 font-sans leading-relaxed whitespace-pre-wrap max-h-60 overflow-y-auto">
-                  {simResult.result?.markdown || JSON.stringify(simResult, null, 2)}
+                <div className="max-h-80 overflow-y-auto pr-1">
+                  {simResult.result?.markdown ? (
+                    <MarkdownOutput content={simResult.result.markdown} />
+                  ) : (
+                    <div className="text-xs text-slate-200 font-sans leading-relaxed whitespace-pre-wrap">
+                      {JSON.stringify(simResult, null, 2)}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
