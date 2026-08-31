@@ -116,11 +116,109 @@ const INITIAL_APPS = [
       primaryColor: "#10B981",
       mode: "dark",
       badge: "Linux Fortune",
-      widgetLayout: "card"
+      widgetLayout: "card",
+      displayMode: "result_only"
     },
     sampleQuery: "Generate a Unix philosophy quote in Cowsay ASCII style",
     webhookUrl: "",
     createdAt: "2026-08-31T00:00:00.000Z"
+  },
+  {
+    id: "app_dev_tip",
+    name: "Daily Senior Dev Tip & Kata",
+    slug: "dev-tip-of-the-day",
+    category: "Developers & Linux",
+    icon: "Sparkles",
+    description: "Instant daily engineering tip, clean code best practice, Git ninja trick, or architecture pattern (Zero-click direct output).",
+    systemPrompt: "You are the Senior Staff Engineer Mentor. Provide a high-value, crisp 30-second coding tip, refactoring insight, or terminal trick with code snippet.",
+    tools: [],
+    inputs: [
+      { id: "topic", label: "Domain", type: "select", options: ["TypeScript & React", "Git & CLI Productivity", "System Design & Cloud", "SQL & Database Indexing", "Clean Code & Refactoring"], required: true, default: "TypeScript & React" }
+    ],
+    theme: {
+      primaryColor: "#38bdf8",
+      mode: "dark",
+      badge: "Senior Dev Tip",
+      widgetLayout: "card",
+      displayMode: "result_only"
+    },
+    sampleQuery: "Give me a high-impact TypeScript tip",
+    webhookUrl: "",
+    createdAt: "2026-08-31T00:10:00.000Z"
+  },
+  {
+    id: "app_tech_pulse",
+    name: "AI & Tech Pulse Radar",
+    slug: "tech-pulse-radar",
+    category: "News & Insights",
+    icon: "TrendingUp",
+    description: "Auto-updating 3-bullet briefing on breakthroughs in AI Agents, Google Cloud, and Open Source ecosystems.",
+    systemPrompt: "You are the Tech Pulse Radar. Provide a crisp 3-bullet executive briefing on agentic AI, Google Cloud ecosystem, and cloud architecture developments.",
+    tools: [],
+    inputs: [
+      { id: "focus", label: "Industry Focus", type: "select", options: ["Autonomous AI Agents", "Google Cloud & Vertex", "DevOps & SRE", "Web Performance"], required: true, default: "Autonomous AI Agents" }
+    ],
+    theme: {
+      primaryColor: "#818cf8",
+      mode: "dark",
+      badge: "Tech Radar",
+      widgetLayout: "card",
+      displayMode: "result_only"
+    },
+    sampleQuery: "Latest autonomous agent ecosystem pulse",
+    webhookUrl: "",
+    createdAt: "2026-08-31T00:15:00.000Z"
+  },
+  {
+    id: "app_shipping_calc",
+    name: "Smart Shipping & Customs Duty Radar",
+    slug: "shipping-customs-calc",
+    category: "Logistics",
+    icon: "Plane",
+    description: "Interactive freight calculator that computes courier rates, estimated delivery days, and customs tax brackets based on weight and country.",
+    systemPrompt: "You are the Global Shipping & Customs Estimator. Calculate international courier costs, transit days, and customs clearance advice based on weight and destination.",
+    tools: [],
+    inputs: [
+      { id: "origin", label: "Origin Country", type: "text", placeholder: "e.g. Argentina", required: true, default: "Argentina" },
+      { id: "destination", label: "Destination Country", type: "text", placeholder: "e.g. Spain", required: true, default: "Spain" },
+      { id: "weight_kg", label: "Package Weight (kg)", type: "number", placeholder: "2.5", required: true, default: 3 },
+      { id: "service_tier", label: "Service Speed", type: "select", options: ["Express Air (2-4 business days)", "Standard Economy (6-10 business days)", "Sea Freight (20-30 days)"], required: true, default: "Express Air (2-4 business days)" }
+    ],
+    theme: {
+      primaryColor: "#f59e0b",
+      mode: "dark",
+      badge: "Freight Radar",
+      widgetLayout: "card",
+      displayMode: "form"
+    },
+    sampleQuery: "Calculate shipping 3kg from Argentina to Spain",
+    webhookUrl: "",
+    createdAt: "2026-08-31T00:20:00.000Z"
+  },
+  {
+    id: "app_freelance_rate",
+    name: "Freelance Project Quote & ROI Estimator",
+    slug: "freelance-rate-estimator",
+    category: "Finance",
+    icon: "TrendingUp",
+    description: "Interactive budget calculator that recommends hourly rates, fixed sprint quotes, and client value multipliers for tech projects.",
+    systemPrompt: "You are the Freelance & Agency Rate Estimator. Calculate recommended fixed project price, hourly rate, and contract milestones breakdown.",
+    tools: [],
+    inputs: [
+      { id: "project_type", label: "Project Scope", type: "select", options: ["AI Agent / LLM Integration", "Full-Stack Web Application", "Mobile App MVP", "API Backend & Cloud Architecture"], required: true, default: "AI Agent / LLM Integration" },
+      { id: "estimated_hours", label: "Estimated Effort (Hours)", type: "number", placeholder: "40", required: true, default: 60 },
+      { id: "seniority", label: "Engineer Seniority", type: "select", options: ["Senior Engineer ($75-$120/hr)", "Lead / Principal Architect ($120-$200/hr)", "Mid-level Developer ($45-$75/hr)"], required: true, default: "Senior Engineer ($75-$120/hr)" }
+    ],
+    theme: {
+      primaryColor: "#ec4899",
+      mode: "dark",
+      badge: "Quote Estimator",
+      widgetLayout: "card",
+      displayMode: "form"
+    },
+    sampleQuery: "Estimate budget for 60 hours AI Agent integration project",
+    webhookUrl: "",
+    createdAt: "2026-08-31T00:25:00.000Z"
   }
 ];
 

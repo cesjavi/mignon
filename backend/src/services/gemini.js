@@ -374,6 +374,107 @@ async function executeSimulatedAgent({ app, userQuery, inputValues }) {
     };
   }
 
+  // If app is Daily Dev Tip (Direct Output)
+  if (app.slug?.includes("dev-tip") || app.name?.toLowerCase().includes("dev tip")) {
+    const topic = inputValues.topic || "TypeScript & React";
+    const tips = {
+      "TypeScript & React": [
+        "💡 **TypeScript Tip: Satisfies Operator**\n\nUse `satisfies` instead of `as` for strict type-checking while preserving specific literal inference:\n```ts\nconst theme = {\n  primary: '#38bdf8',\n  accent: '#10b981'\n} satisfies Record<string, string>;\n// theme.primary is inferred as exact '#38bdf8' instead of generic string!\n```\n*Zero runtime overhead, 100% type safety.*",
+        "⚡ **React 19 Tip: Action Transitions**\n\nReplace complex `isLoading` states with `useTransition()` for automatic async pending states without UI freezing:\n```tsx\nconst [isPending, startTransition] = useTransition();\nconst handleSave = () => startTransition(async () => await saveAgent());\n```"
+      ],
+      "Git & CLI Productivity": [
+        "🛠️ **Git Ninja Tip: Interactive Rebase Autosquash**\n\nFix typo commits cleanly without manual rebasing:\n```bash\ngit commit -a --fixup <commit-hash>\ngit rebase -i --autosquash <commit-hash>~\n```\n*Git automatically re-orders and squashes the fixup commit!*"
+      ],
+      "System Design & Cloud": [
+        "☁️ **Cloud Run Scalability Tip: Concurrency Tuning**\n\nBy default Cloud Run handles 80 concurrent requests per container. For Node.js/Go async workloads, increase concurrency to 250 to cut cold starts and billing by up to 60%."
+      ],
+      "SQL & Database Indexing": [
+        "🔍 **PostgreSQL Index Tip: Partial Indexes**\n\nDon't index the entire table if queries only filter active records:\n```sql\nCREATE INDEX idx_active_runs ON runs(created_at) WHERE status = 'pending';\n```\n*Saves 80% disk and speeds up writes!*"
+      ]
+    };
+
+    const list = tips[topic] || tips["TypeScript & React"];
+    const chosenTip = list[Math.floor(Math.random() * list.length)];
+
+    return {
+      status: "success",
+      text: chosenTip,
+      toolExecuted: null,
+      toolResults: { topic },
+      tokensTotal: 160
+    };
+  }
+
+  // If app is Tech Pulse Radar (Direct Output)
+  if (app.slug?.includes("tech-pulse") || app.name?.toLowerCase().includes("pulse")) {
+    const focus = inputValues.focus || "Autonomous AI Agents";
+    const pulseText = `📡 **AI & Tech Radar Pulse** [${focus}]\n\n` +
+      `1. 🚀 **Gemini 3.5 Flash Tool Loop:** Function calling latency reduced below 400ms across Google Cloud Run endpoints.\n` +
+      `2. 🧠 **Agent Registry Ecosystems:** Trend shifting from standalone chatbots to micro-agent fleets embedded via Shadow DOM web components.\n` +
+      `3. 🔒 **Model Armor & Zero-Trust:** Enterprise adoption of SHA-256 API key rotation and OpenTelemetry audit logging up 340% YoY.\n\n` +
+      `*Source: Mignon Global Intelligence Stream • Updated live.*`;
+
+    return {
+      status: "success",
+      text: pulseText,
+      toolExecuted: null,
+      toolResults: { focus },
+      tokensTotal: 180
+    };
+  }
+
+  // If app is Shipping Calculator (Interactive)
+  if (app.slug?.includes("shipping") || app.name?.toLowerCase().includes("shipping")) {
+    const origin = inputValues.origin || "Argentina";
+    const destination = inputValues.destination || "Spain";
+    const weight = Number(inputValues.weight_kg) || 3;
+    const tier = inputValues.service_tier || "Express Air (2-4 business days)";
+
+    const baseRate = Math.round(weight * 28 + 45);
+    const expressRate = Math.round(baseRate * 1.35);
+
+    const shippingText = `📦 **International Freight Quote: ${origin} ➔ ${destination}**\n\n` +
+      `• **Package Weight:** \`${weight} kg\`\n` +
+      `• **Estimated Courier Cost:** **$${expressRate} USD** (${tier})\n` +
+      `• **Standard Economy Alternative:** $${baseRate} USD (6-10 business days)\n` +
+      `• **Customs & Duty Advisory:** Low tax threshold applicable. Commercial invoice (HS Code 8542) required.\n\n` +
+      `*Rates calculated via Gemini Logistics Freight tools.*`;
+
+    return {
+      status: "success",
+      text: shippingText,
+      toolExecuted: null,
+      toolResults: { origin, destination, weight, expressRate, baseRate },
+      tokensTotal: 210
+    };
+  }
+
+  // If app is Freelance Project Rate Estimator (Interactive)
+  if (app.slug?.includes("freelance") || app.name?.toLowerCase().includes("freelance")) {
+    const projectType = inputValues.project_type || "AI Agent / LLM Integration";
+    const hours = Number(inputValues.estimated_hours) || 60;
+    const seniority = inputValues.seniority || "Senior Engineer ($75-$120/hr)";
+
+    const hourlyRate = seniority.includes("120") ? 140 : seniority.includes("75") ? 95 : 60;
+    const totalFixed = hours * hourlyRate;
+    const bufferQuote = Math.round(totalFixed * 1.2);
+
+    const quoteText = `💼 **Freelance Project Quote & ROI Estimator**\n\n` +
+      `• **Project Scope:** ${projectType}\n` +
+      `• **Recommended Fixed Sprint Quote:** **$${bufferQuote.toLocaleString()} USD** (Includes 20% scope buffer)\n` +
+      `• **Hourly Base Rate:** $${hourlyRate} USD/hr × ${hours} estimated hours\n` +
+      `• **Payment Milestones:** 30% Kickoff ($${Math.round(bufferQuote * 0.3)}), 40% Beta Delivery ($${Math.round(bufferQuote * 0.4)}), 30% Launch Handover ($${Math.round(bufferQuote * 0.3)})\n\n` +
+      `*Estimated client ROI payback: 3 to 6 weeks based on automation savings.*`;
+
+    return {
+      status: "success",
+      text: quoteText,
+      toolExecuted: null,
+      toolResults: { projectType, hours, hourlyRate, totalFixed: bufferQuote },
+      tokensTotal: 230
+    };
+  }
+
   // If tool is flight_search
   if (appTools.includes("flight_search")) {
     const toolResults = await executeTool("flight_search", {

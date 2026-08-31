@@ -120,31 +120,40 @@
   </div>
 
   <div class="widgets-grid" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));">
-    <!-- Embedded Direct Fortune Quote Widget (Instant Auto-Display) -->
+    <!-- 1. Pure Result Only (Non-Interactive / Minimalist) -->
     <div class="widget-container-card">
       <div class="widget-header">
-        <span class="widget-title">🐧 Quote of the Day (Direct Display)</span>
+        <span class="widget-title">💡 Dev Tip of the Day (Pure Result)</span>
+        <span class="code-tag">&lt;div data-display="result_only"&gt;</span>
+      </div>
+      <div data-mignon-app="app_dev_tip" data-display="result_only" data-theme="dark"></div>
+    </div>
+
+    <!-- 2. Direct Card (Non-Interactive Auto-Run with Controls) -->
+    <div class="widget-container-card">
+      <div class="widget-header">
+        <span class="widget-title">📡 AI Tech Pulse Radar (Auto-Run)</span>
         <span class="code-tag">&lt;div data-display="direct"&gt;</span>
       </div>
-      <div data-mignon-app="app_linux_fortune" data-display="direct" data-theme="dark"></div>
+      <div data-mignon-app="app_tech_pulse" data-display="direct" data-theme="dark"></div>
     </div>
 
-    <!-- Embedded Flight Scout Widget -->
+    <!-- 3. Interactive Form: Smart Shipping & Customs Calculator -->
     <div class="widget-container-card">
       <div class="widget-header">
-        <span class="widget-title">✈️ Embedded Travel Scout</span>
-        <span class="code-tag">&lt;div data-mignon-app="app_flight_scout"&gt;</span>
+        <span class="widget-title">📦 Freight & Customs Estimator (Interactive)</span>
+        <span class="code-tag">&lt;div data-mignon-app="app_shipping_calc"&gt;</span>
       </div>
-      <div data-mignon-app="app_flight_scout" data-theme="dark"></div>
+      <div data-mignon-app="app_shipping_calc" data-theme="dark"></div>
     </div>
 
-    <!-- Embedded World Clock Widget -->
+    <!-- 4. Interactive Form: Freelance Quote Estimator -->
     <div class="widget-container-card">
       <div class="widget-header">
-        <span class="widget-title">🌍 Embedded Global Sync</span>
-        <span class="code-tag">&lt;div data-mignon-app="app_world_clock"&gt;</span>
+        <span class="widget-title">💼 Freelance Project Quote (Interactive)</span>
+        <span class="code-tag">&lt;div data-mignon-app="app_freelance_rate"&gt;</span>
       </div>
-      <div data-mignon-app="app_world_clock" data-theme="dark"></div>
+      <div data-mignon-app="app_freelance_rate" data-theme="dark"></div>
     </div>
   </div>
 
