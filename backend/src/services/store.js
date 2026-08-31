@@ -98,6 +98,29 @@ const INITIAL_APPS = [
     sampleQuery: "Qualify Apex Logistics for an enterprise agent fleet rollout",
     webhookUrl: "",
     createdAt: "2026-08-30T11:30:00.000Z"
+  },
+  {
+    id: "app_linux_fortune",
+    name: "Linux Fortune & Quote of the Day",
+    slug: "linux-fortune-quotes",
+    category: "Developers & Linux",
+    icon: "Sparkles",
+    description: "Generates Unix/Linux fortune wisdom, hacker folklore, sysadmin humor and philosophical tech quotes with Cowsay ASCII art.",
+    systemPrompt: "You are the Linux Fortune Agent. Generate inspiring, humorous, or philosophical Unix/Linux quotes, hacker folklore, or sysadmin wisdom according to user preferences.",
+    tools: [],
+    inputs: [
+      { id: "category", label: "Fortune Topic", type: "select", options: ["Unix Philosophy", "Hacker Folklore", "Sysadmin Wisdom", "Open Source & Freedom", "Zen of Python"], required: true, default: "Unix Philosophy" },
+      { id: "style", label: "Display Style", type: "select", options: ["Terminal Box", "Cowsay ASCII", "Zen Minimalist"], required: false, default: "Cowsay ASCII" }
+    ],
+    theme: {
+      primaryColor: "#10B981",
+      mode: "dark",
+      badge: "Linux Fortune",
+      widgetLayout: "card"
+    },
+    sampleQuery: "Generate a Unix philosophy quote in Cowsay ASCII style",
+    webhookUrl: "",
+    createdAt: "2026-08-31T00:00:00.000Z"
   }
 ];
 
