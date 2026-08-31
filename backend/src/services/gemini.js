@@ -484,14 +484,14 @@ async function executeSimulatedAgent({ app, userQuery, inputValues }) {
       cabin_class: inputValues.cabin_class || "economy"
     });
 
-    const cheapest = toolResults.flights[1];
-    const fastest = toolResults.flights[0];
+    const recommended = toolResults.flights[0];
+    const alternative = toolResults.flights[1] || toolResults.flights[0];
 
     const summaryText = `✈️ **Flight Scout Results for ${toolResults.search_query.origin} ➔ ${toolResults.search_query.destination}**\n\n` +
-      `• **Recommended Option:** ${fastest.airline} (${fastest.flight_number}) — **$${fastest.price_usd} USD** (Direct, ${fastest.duration})\n` +
-      `• **Best Value:** ${cheapest.airline} (${cheapest.flight_number}) — **$${cheapest.price_usd} USD** (${cheapest.stop_details})\n` +
-      `• **Eco-Index:** ${fastest.carbon_emissions}\n\n` +
-      `*Seats remaining at this fare: ${fastest.seats_available}. Prices guaranteed for 24h.*`;
+      `• **Recommended Flight:** ${recommended.airline} (${recommended.flight_number}) — **$${recommended.price_usd} USD** (${recommended.stop_details}, ${recommended.duration})\n` +
+      `• **Alternative Option:** ${alternative.airline} (${alternative.flight_number}) — **$${alternative.price_usd} USD** (${alternative.stop_details}, ${alternative.duration})\n` +
+      `• **Eco-Footprint:** ${recommended.carbon_emissions}\n\n` +
+      `*${recommended.seats_available} seats remaining at this fare. Fares analyzed by Gemini Travel Agent.*`;
 
     return {
       status: "success",
