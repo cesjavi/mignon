@@ -4,7 +4,24 @@
  */
 (function () {
   const SCRIPT_TAG = document.currentScript;
-  const DEFAULT_API_URL = SCRIPT_TAG?.getAttribute("data-api-url") || window.__MIGNON_API_URL__ || "http://localhost:4000";
+  
+  let detectedApiUrl = "";
+  try {
+    if (SCRIPT_TAG && SCRIPT_TAG.src) {
+      const parsedUrl = new URL(SCRIPT_TAG.src, window.location.href);
+      detectedApiUrl = parsedUrl.origin;
+    }
+  } catch (e) {}
+
+  if (!detectedApiUrl && typeof window !== "undefined" && window.location) {
+    detectedApiUrl = window.location.origin;
+  }
+
+  const DEFAULT_API_URL = 
+    SCRIPT_TAG?.getAttribute("data-api-url") || 
+    window.__MIGNON_API_URL__ || 
+    detectedApiUrl || 
+    "https://mignon-platform-526192292529.us-central1.run.app";
 
   function initAllWidgets() {
     const containers = document.querySelectorAll("[data-mignon-app], #mignon-widget, .mignon-widget");
