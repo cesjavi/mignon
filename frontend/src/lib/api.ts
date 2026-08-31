@@ -13,6 +13,7 @@ export interface MiniAppTheme {
   mode: 'dark' | 'light';
   badge?: string;
   widgetLayout: 'card' | 'floating';
+  displayMode?: 'form' | 'direct';
 }
 
 export interface MiniApp {

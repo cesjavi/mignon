@@ -119,7 +119,16 @@
     </p>
   </div>
 
-  <div class="widgets-grid">
+  <div class="widgets-grid" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));">
+    <!-- Embedded Direct Fortune Quote Widget (Instant Auto-Display) -->
+    <div class="widget-container-card">
+      <div class="widget-header">
+        <span class="widget-title">🐧 Quote of the Day (Direct Display)</span>
+        <span class="code-tag">&lt;div data-display="direct"&gt;</span>
+      </div>
+      <div data-mignon-app="app_linux_fortune" data-display="direct" data-theme="dark"></div>
+    </div>
+
     <!-- Embedded Flight Scout Widget -->
     <div class="widget-container-card">
       <div class="widget-header">

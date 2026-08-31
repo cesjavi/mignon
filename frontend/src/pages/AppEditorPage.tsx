@@ -35,6 +35,7 @@ export const AppEditorPage: React.FC = () => {
   const [primaryColor, setPrimaryColor] = useState('#38bdf8');
   const [badge, setBadge] = useState('AI Mini-App');
   const [widgetLayout, setWidgetLayout] = useState<'card' | 'floating'>('card');
+  const [displayMode, setDisplayMode] = useState<'form' | 'direct'>('form');
   const [webhookUrl, setWebhookUrl] = useState('');
 
   // Simulator State
@@ -78,6 +79,7 @@ export const AppEditorPage: React.FC = () => {
       setPrimaryColor(app.theme?.primaryColor || '#38bdf8');
       setBadge(app.theme?.badge || 'AI Mini-App');
       setWidgetLayout(app.theme?.widgetLayout || 'card');
+      setDisplayMode(app.theme?.displayMode || (app.slug?.includes('fortune') ? 'direct' : 'form'));
       setWebhookUrl(app.webhookUrl || '');
 
       const initSim: Record<string, any> = {};
@@ -139,7 +141,8 @@ export const AppEditorPage: React.FC = () => {
         primaryColor,
         mode: 'dark',
         badge,
-        widgetLayout
+        widgetLayout,
+        displayMode
       }
     };
 
@@ -491,6 +494,18 @@ export const AppEditorPage: React.FC = () => {
                 >
                   <option value="card">Inline Card</option>
                   <option value="floating">Floating Bubble</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Presentation Mode</label>
+                <select
+                  value={displayMode}
+                  onChange={(e) => setDisplayMode(e.target.value as any)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
+                >
+                  <option value="form">Interactive Form (Ask inputs & click Run)</option>
+                  <option value="direct">Direct Auto-Display (Show quote/result directly)</option>
                 </select>
               </div>
             </div>

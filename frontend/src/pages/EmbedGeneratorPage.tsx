@@ -13,6 +13,7 @@ export const EmbedGeneratorPage: React.FC = () => {
   const [apps, setApps] = useState<MiniApp[]>([]);
   const [selectedAppId, setSelectedAppId] = useState<string>(initialAppId || '');
   const [embedMode, setEmbedMode] = useState<'inline' | 'floating' | 'iframe' | 'react'>('inline');
+  const [displayMode, setDisplayMode] = useState<'form' | 'direct'>('form');
   const [copied, setCopied] = useState(false);
   const [themeMode, setThemeMode] = useState<'dark' | 'light'>('dark');
 
@@ -28,6 +29,7 @@ export const EmbedGeneratorPage: React.FC = () => {
       setApps(data);
       if (data.length > 0 && !selectedAppId) {
         setSelectedAppId(data[0].id);
+        setDisplayMode(data[0].theme?.displayMode || (data[0].slug?.includes('fortune') ? 'direct' : 'form'));
       }
     } catch (err) {
       console.error(err);
@@ -35,6 +37,12 @@ export const EmbedGeneratorPage: React.FC = () => {
   }
 
   const selectedApp = apps.find((a) => a.id === selectedAppId);
+
+  useEffect(() => {
+    if (selectedApp) {
+      setDisplayMode(selectedApp.theme?.displayMode || (selectedApp.slug?.includes('fortune') ? 'direct' : 'form'));
+    }
+  }, [selectedApp]);
 
   // Mount/Refresh the embed widget in the preview box
   useEffect(() => {
@@ -44,10 +52,10 @@ export const EmbedGeneratorPage: React.FC = () => {
     const widgetDiv = document.createElement('div');
     widgetDiv.setAttribute('data-mignon-app', selectedApp.id);
     widgetDiv.setAttribute('data-theme', themeMode);
+    widgetDiv.setAttribute('data-display', displayMode);
     widgetDiv.setAttribute('data-api-url', window.location.origin);
     widgetPreviewRef.current.appendChild(widgetDiv);
 
-    // Re-initialize widget
     if ((window as any).Mignon) {
       (window as any).Mignon.init();
     } else {
@@ -56,21 +64,22 @@ export const EmbedGeneratorPage: React.FC = () => {
       script.async = true;
       document.body.appendChild(script);
     }
-  }, [selectedApp, themeMode, embedMode]);
+  }, [selectedApp, themeMode, embedMode, displayMode]);
 
   function getCodeSnippet(): string {
     const origin = window.location.origin;
     const appId = selectedApp?.id || 'app_flight_scout';
+    const displayAttr = displayMode === 'direct' ? ' data-display="direct"' : '';
 
     switch (embedMode) {
       case 'inline':
-        return `<!-- Place this anywhere in your HTML <body> -->\n<div data-mignon-app="${appId}" data-theme="${themeMode}"></div>\n<script src="${origin}/widget.js" async></script>`;
+        return `<!-- Place this anywhere in your HTML <body> -->\n<div data-mignon-app="${appId}" data-theme="${themeMode}"${displayAttr}></div>\n<script src="${origin}/widget.js" async></script>`;
       case 'floating':
         return `<!-- Place this once before the closing </body> tag -->\n<script src="${origin}/widget.js" data-app-id="${appId}" data-mode="floating" async></script>`;
       case 'iframe':
-        return `<iframe \n  src="${origin}/embed-frame.html?app=${appId}&theme=${themeMode}" \n  width="100%" \n  height="480" \n  frameborder="0" \n  style="border-radius: 16px; border: 1px solid #1e293b;"\n></iframe>`;
+        return `<iframe \n  src="${origin}/embed-frame.html?app=${appId}&theme=${themeMode}&display=${displayMode}" \n  width="100%" \n  height="480" \n  frameborder="0" \n  style="border-radius: 16px; border: 1px solid #1e293b;"\n></iframe>`;
       case 'react':
-        return `import { useEffect } from 'react';\n\nexport function MignonWidget() {\n  useEffect(() => {\n    const s = document.createElement('script');\n    s.src = '${origin}/widget.js';\n    s.async = true;\n    document.body.appendChild(s);\n    return () => { s.remove(); };\n  }, []);\n\n  return <div data-mignon-app="${appId}" data-theme="${themeMode}" />;\n}`;
+        return `import { useEffect } from 'react';\n\nexport function MignonWidget() {\n  useEffect(() => {\n    const s = document.createElement('script');\n    s.src = '${origin}/widget.js';\n    s.async = true;\n    document.body.appendChild(s);\n    return () => { s.remove(); };\n  }, []);\n\n  return <div data-mignon-app="${appId}" data-theme="${themeMode}"${displayAttr} />;\n}`;
     }
   }
 
@@ -140,6 +149,39 @@ export const EmbedGeneratorPage: React.FC = () => {
                   );
                 })}
               </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
+                3. Presentation Mode
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDisplayMode('form')}
+                  className={`p-2.5 rounded-xl border text-xs font-semibold transition-all ${
+                    displayMode === 'form'
+                      ? 'bg-sky-500/15 border-sky-500/40 text-sky-300'
+                      : 'bg-slate-950/40 border-slate-800 text-slate-400 hover:border-slate-700'
+                  }`}
+                >
+                  Interactive Form
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDisplayMode('direct')}
+                  className={`p-2.5 rounded-xl border text-xs font-semibold transition-all ${
+                    displayMode === 'direct'
+                      ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
+                      : 'bg-slate-950/40 border-slate-800 text-slate-400 hover:border-slate-700'
+                  }`}
+                >
+                  Direct Auto-Display ✨
+                </button>
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1.5">
+                {displayMode === 'direct' ? 'Auto-runs on page load and renders the quote / result directly.' : 'Renders inputs and an Execute button.'}
+              </p>
             </div>
 
             {/* Generated Code Box */}
