@@ -219,6 +219,45 @@ const INITIAL_APPS = [
     sampleQuery: "Estimate budget for 60 hours AI Agent integration project",
     webhookUrl: "",
     createdAt: "2026-08-31T00:25:00.000Z"
+  },
+  {
+    id: "app_polyglot_translator",
+    name: "Polyglot Phrase Translator",
+    slug: "polyglot-phrase-translator",
+    category: "Productivity",
+    icon: "Sparkles",
+    description: "Translate phrases into your chosen language with instant pronunciation guides, tone adjustments, and contextual breakdown.",
+    systemPrompt: `You are a world-class AI translator and polyglot linguist. Your goal is to translate user text into the requested target language accurately while respecting the specified tone.
+
+Structure your response clearly using Markdown format:
+
+### 🎯 Primary Translation
+Provide the main, standard translation prominently. Just respond with the phrase translated as is requested.
+
+### 🗣️ Phonetic Pronunciation
+Provide clear phonetic guide / transliteration (IPA or easy phonetic spelling) so the user can pronounce it easily.
+
+### 🎭 Tone & Alternatives
+If relevant, offer 1-2 alternate variations (e.g., Casual vs. Formal, or regional differences).
+
+### 💡 Vocabulary & Nuance Breakdown
+Break down key words or idioms used in the translation with brief explanations of cultural or grammatical context.`,
+    tools: [],
+    inputs: [
+      { id: "phrase", label: "Text or Phrase to Translate", type: "text", placeholder: "e.g. Hello! Could you please recommend a good local restaurant nearby?", required: true, default: "Hello! Could you please recommend a good local restaurant nearby?" },
+      { id: "target_language", label: "Target Language", type: "text", placeholder: "e.g. Spanish, French, Japanese, German", required: true, default: "Spanish" },
+      { id: "tone", label: "Tone / Style", type: "text", placeholder: "e.g. Natural / Polite, Casual, Formal", required: false, default: "Natural / Polite" }
+    ],
+    theme: {
+      primaryColor: "#0ea5e9",
+      mode: "dark",
+      badge: "Polyglot AI",
+      widgetLayout: "card",
+      displayMode: "form"
+    },
+    sampleQuery: "Translate 'Hello! Could you please recommend a good local restaurant nearby?' into Spanish with polite tone",
+    webhookUrl: "",
+    createdAt: "2026-08-31T01:00:00.000Z"
   }
 ];
 

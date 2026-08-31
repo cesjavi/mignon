@@ -127,19 +127,77 @@ export interface AnalyticsData {
 }
 
 const API_BASE = '/api/v1';
+const LOCAL_STORAGE_KEY = 'mignon_custom_apps_v1';
+
+function getLocalApps(): MiniApp[] {
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveLocalApp(app: MiniApp) {
+  try {
+    const apps = getLocalApps().filter(a => a.id !== app.id);
+    apps.unshift(app);
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(apps));
+  } catch (e) {}
+}
+
+function removeLocalApp(id: string) {
+  try {
+    const apps = getLocalApps().filter(a => a.id !== id);
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(apps));
+  } catch (e) {}
+}
 
 export async function fetchApps(): Promise<MiniApp[]> {
-  const res = await fetch(`${API_BASE}/apps`);
-  if (!res.ok) throw new Error('Failed to fetch apps');
-  const json = await res.json();
-  return json.data;
+  try {
+    const res = await fetch(`${API_BASE}/apps`);
+    const json = res.ok ? await res.json() : { data: [] };
+    const backendApps: MiniApp[] = json.data || [];
+    
+    // Merge with custom apps from localStorage
+    const localApps = getLocalApps();
+    const appMap = new Map<string, MiniApp>();
+    
+    backendApps.forEach(a => appMap.set(a.id, a));
+    
+    // For any local app not in backend, sync to server in background
+    for (const localApp of localApps) {
+      if (!appMap.has(localApp.id)) {
+        appMap.set(localApp.id, localApp);
+        // Sync to backend so server knows about it
+        fetch(`${API_BASE}/apps`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(localApp)
+        }).catch(() => {});
+      }
+    }
+    
+    return Array.from(appMap.values());
+  } catch (err) {
+    const localApps = getLocalApps();
+    if (localApps.length > 0) return localApps;
+    throw err;
+  }
 }
 
 export async function fetchAppById(id: string): Promise<MiniApp> {
-  const res = await fetch(`${API_BASE}/apps/${id}`);
-  if (!res.ok) throw new Error('Failed to fetch app');
-  const json = await res.json();
-  return json.data;
+  const localApp = getLocalApps().find(a => a.id === id);
+  try {
+    const res = await fetch(`${API_BASE}/apps/${id}`);
+    if (res.ok) {
+      const json = await res.json();
+      return json.data;
+    }
+  } catch (e) {}
+  
+  if (localApp) return localApp;
+  throw new Error('Failed to fetch app');
 }
 
 export async function createApp(data: Partial<MiniApp>): Promise<MiniApp> {
@@ -150,7 +208,9 @@ export async function createApp(data: Partial<MiniApp>): Promise<MiniApp> {
   });
   if (!res.ok) throw new Error('Failed to create app');
   const json = await res.json();
-  return json.data;
+  const created = json.data;
+  saveLocalApp(created);
+  return created;
 }
 
 export async function generateMiniAppWithAI(prompt: string): Promise<Partial<MiniApp>> {
@@ -172,10 +232,13 @@ export async function updateApp(id: string, updates: Partial<MiniApp>): Promise<
   });
   if (!res.ok) throw new Error('Failed to update app');
   const json = await res.json();
-  return json.data;
+  const updated = json.data;
+  saveLocalApp(updated);
+  return updated;
 }
 
 export async function deleteApp(id: string): Promise<void> {
+  removeLocalApp(id);
   const res = await fetch(`${API_BASE}/apps/${id}`, { method: 'DELETE' });
   if (!res.ok) throw new Error('Failed to delete app');
 }

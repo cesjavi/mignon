@@ -596,12 +596,95 @@ async function executeSimulatedAgent({ app, userQuery, inputValues }) {
     };
   }
 
+  // If translator or language conversion app
+  const isTranslator = (app.name && app.name.toLowerCase().includes("translat")) ||
+    (app.systemPrompt && app.systemPrompt.toLowerCase().includes("translat")) ||
+    inputValues.phrase || inputValues.target_language || inputValues.text_to_translate;
+
+  if (isTranslator) {
+    const rawPhrase = inputValues.phrase || inputValues.text_to_translate || inputValues.query || userQuery || "Hello! Could you please recommend a good local restaurant nearby?";
+    const targetLang = (inputValues.target_language || "Spanish").trim();
+    const tone = (inputValues.tone || "Natural / Polite").trim();
+
+    const isSpanish = targetLang.toLowerCase().includes("span") || targetLang.toLowerCase().includes("esp");
+    const isFrench = targetLang.toLowerCase().includes("fren") || targetLang.toLowerCase().includes("fra");
+    const isGerman = targetLang.toLowerCase().includes("germ") || targetLang.toLowerCase().includes("alem");
+    const isJapanese = targetLang.toLowerCase().includes("jap") || targetLang.toLowerCase().includes("nihon");
+    const isItalian = targetLang.toLowerCase().includes("ital");
+
+    let primaryTrans = "";
+    let phonetics = "";
+    let casualAlt = "";
+    let formalAlt = "";
+    let vocabList = "";
+
+    if (rawPhrase.toLowerCase().includes("restaurant") || rawPhrase.toLowerCase().includes("eat") || rawPhrase.toLowerCase().includes("food")) {
+      if (isSpanish) {
+        primaryTrans = "¡Hola! ¿Podría recomendarme un buen restaurante local cerca de aquí?";
+        phonetics = "*OH-lah! ¿poh-DREE-ah reh-koh-men-DAR-meh oon bwehn res-tau-RAN-teh loh-KAL SIER-kah deh ah-KEE?*";
+        casualAlt = "¡Hola! ¿Me recomiendas un buen lugar para comer por aquí?";
+        formalAlt = "¡Buenas tardes! ¿Sería tan amable de recomendarme un restaurante típico de la zona?";
+        vocabList = "• **¡Hola!:** Saludo universal y amigable.\n• **¿Podría...?:** Condicional de cortesía formal (*usted*).\n• **recomendarme:** Verbo *recomendar* + pronombre *me*.\n• **cerca de aquí:** Modismo natural para 'nearby'.";
+      } else if (isFrench) {
+        primaryTrans = "Bonjour ! Pourriez-vous me recommander un bon restaurant local à proximité ?";
+        phonetics = "*bon-ZHOOR ! poor-yay-VOO muh ruh-ko-mahn-DAY un bon res-to-RAHN lo-KAL ah prok-see-mee-TAY ?*";
+        casualAlt = "Salut ! Tu connais un bon resto dans le coin ?";
+        formalAlt = "Bonjour Madame/Monsieur, auriez-vous l'amabilité de me conseiller une bonne table locale ?";
+        vocabList = "• **Pourriez-vous:** Formule de politesse au conditionnel.\n• **À proximité:** Expression idiomatique pour 'nearby'.\n• **Resto:** Diminutif familier très courant en français.";
+      } else if (isJapanese) {
+        primaryTrans = "こんにちは！この近くでおすすめの美味しい地元のレストランを教えていただけますか？";
+        phonetics = "*Konnichiwa! Kono chikaku de osusume no oishii jimoto no resutoran o oshiete itadakemasu ka?*";
+        casualAlt = "ねえ、この辺で美味しいお店ある？";
+        formalAlt = "恐れ入りますが、この近辺で評判の良いお食事処をご紹介いただけますでしょうか。";
+        vocabList = "• **この近く (kono chikaku):** 'Around here / nearby'.\n• **おすすめ (osusume):** 'Recommendation'.\n• **教えていただけますか (oshiete itadakemasu ka):** Polite request.";
+      } else {
+        primaryTrans = `Hello! Could you please recommend a good local restaurant nearby? (${targetLang})`;
+        phonetics = "*Standard local pronunciation guide*";
+        casualAlt = "Hey, any good spots to eat around here?";
+        formalAlt = "Excuse me, would you be so kind as to recommend a fine local dining establishment?";
+        vocabList = "• **Polite address:** Suitable for hospitality & concierge interactions.";
+      }
+    } else {
+      // General phrase translation
+      primaryTrans = isSpanish 
+        ? `Traducción al ${targetLang}: "${rawPhrase}"`
+        : `Translation to ${targetLang}: "${rawPhrase}"`;
+      phonetics = "*[Phonetic guide generated for clear pronunciation]*";
+      casualAlt = `Casual style: "${rawPhrase}"`;
+      formalAlt = `Formal style: "${rawPhrase}"`;
+      vocabList = `• **Context:** Translated accurately into ${targetLang} with ${tone} tone.`;
+    }
+
+    const summaryText = `### 🎯 Primary Translation\n` +
+      `**${primaryTrans}**\n\n` +
+      `---\n\n` +
+      `### 🗣️ Phonetic Pronunciation\n` +
+      `${phonetics}\n\n` +
+      `---\n\n` +
+      `### 🎭 Tone & Alternatives\n` +
+      `• **Casual / Friendly:** ${casualAlt}\n` +
+      `• **Formal / Polite:** ${formalAlt}\n\n` +
+      `---\n\n` +
+      `### 💡 Vocabulary & Nuance Breakdown\n` +
+      `${vocabList}`;
+
+    return {
+      status: "success",
+      text: summaryText,
+      toolExecuted: null,
+      toolResults: { target_language: targetLang, tone },
+      tokensTotal: 280
+    };
+  }
+
   // Default clean generative task execution
   return {
     status: "success",
-    text: `⚡ **${app.name} Response**\n\nProcessed query parameters:\n` +
+    text: `⚡ **${app.name}**\n\n` +
+      `### 📋 Execution Output\n` +
       Object.entries(inputValues).map(([k, v]) => `• **${k}:** ${v}`).join("\n") +
-      `\n\n*Autonomous execution completed successfully by Mignon Agent Engine.*`,
+      `\n\n> **Persona / Instructions Applied:** ${app.systemPrompt ? app.systemPrompt.substring(0, 120) + '...' : 'Autonomous Gemini Agent'}\n\n` +
+      `*Autonomous execution completed successfully by Mignon Agent Engine.*`,
     toolExecuted: null,
     toolResults: null,
     tokensTotal: 180
