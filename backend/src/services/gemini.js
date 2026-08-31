@@ -151,12 +151,12 @@ async function executeGeminiLive({ model, systemInstruction, prompt, allowedTool
 
     if (toolFollowUpRes.ok) {
       const followUpData = await toolFollowUpRes.json();
-      finalResponseText = followUpData.candidates?.[0]?.content?.parts?.find(p => p.text)?.text || "";
+      finalResponseText = followUpData.candidates?.[0]?.content?.parts?.filter(p => p.text)?.map(p => p.text)?.join("\n") || "";
     } else {
       finalResponseText = formatFallbackMarkdown(functionCall.name, toolResults);
     }
   } else {
-    finalResponseText = candidate?.content?.parts?.find(p => p.text)?.text || "";
+    finalResponseText = candidate?.content?.parts?.filter(p => p.text)?.map(p => p.text)?.join("\n") || "";
   }
 
   return {

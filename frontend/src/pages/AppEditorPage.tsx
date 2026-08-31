@@ -37,6 +37,7 @@ export const AppEditorPage: React.FC = () => {
   const [widgetLayout, setWidgetLayout] = useState<'card' | 'floating'>('card');
   const [displayMode, setDisplayMode] = useState<'form' | 'direct' | 'result_only'>('form');
   const [webhookUrl, setWebhookUrl] = useState('');
+  const [sampleQuery, setSampleQuery] = useState('');
   const [cooldownSeconds, setCooldownSeconds] = useState<number>(3);
   const [maxRequestsPerSession, setMaxRequestsPerSession] = useState<number>(10);
   const [quotaExceededMessage, setQuotaExceededMessage] = useState<string>('You have reached the free query limit for this session. Please check back later or contact the administrator.');
@@ -179,11 +180,19 @@ export const AppEditorPage: React.FC = () => {
     setSimRunning(true);
     setSimResult(null);
     try {
-      const targetId = isNew ? 'app_world_clock' : (id || 'app_world_clock');
-      const res = await executeMiniApp(targetId, simInputs);
+      const liveAppPayload: Partial<MiniApp> = {
+        name,
+        description,
+        systemPrompt,
+        tools,
+        inputs,
+        sampleQuery
+      };
+      const targetId = isNew ? 'live_test' : (id || 'live_test');
+      const res = await executeMiniApp(targetId, simInputs, undefined, undefined, liveAppPayload);
       setSimResult(res);
     } catch (err: any) {
-      setSimResult({ error: err.message });
+      setSimResult({ error: err.message || 'Execution failed' });
     } finally {
       setSimRunning(false);
     }

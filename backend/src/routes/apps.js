@@ -83,8 +83,18 @@ appsRouter.delete("/:id", (req, res) => {
 
 // POST /api/v1/apps/:id/run - execute mini-app with Gemini Tools & Webhook dispatch
 appsRouter.post("/:id/run", async (req, res) => {
-  const app = store.getAppById(req.params.id);
-  if (!app) {
+  let app = store.getAppById(req.params.id);
+  
+  if (req.body.app) {
+    app = {
+      id: req.params.id || "live_test",
+      name: req.body.app.name || app?.name || "Live Test Mini-App",
+      systemPrompt: req.body.app.systemPrompt !== undefined ? req.body.app.systemPrompt : (app?.systemPrompt || ""),
+      tools: req.body.app.tools || app?.tools || [],
+      inputs: req.body.app.inputs || app?.inputs || [],
+      sampleQuery: req.body.app.sampleQuery || app?.sampleQuery || ""
+    };
+  } else if (!app) {
     return res.status(404).json({ error: "Mini-App not found", code: "APP_NOT_FOUND" });
   }
 
@@ -123,9 +133,12 @@ appsRouter.post("/:id/run", async (req, res) => {
   }
 
   try {
+    const hasInputs = Object.keys(inputs).length > 0;
+    const finalUserQuery = query || (hasInputs ? "" : app.sampleQuery);
+
     const agentResult = await runAgentWithTools({
       app,
-      userQuery: query || app.sampleQuery,
+      userQuery: finalUserQuery,
       inputValues: inputs,
       sessionId
     });

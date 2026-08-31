@@ -180,7 +180,13 @@ export async function deleteApp(id: string): Promise<void> {
   if (!res.ok) throw new Error('Failed to delete app');
 }
 
-export async function executeMiniApp(id: string, inputs: Record<string, any>, apiKey?: string, sessionId?: string) {
+export async function executeMiniApp(
+  id: string, 
+  inputs: Record<string, any>, 
+  apiKey?: string, 
+  sessionId?: string,
+  appOverride?: Partial<MiniApp>
+) {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (apiKey) {
     headers['Authorization'] = `Bearer ${apiKey.trim()}`;
@@ -188,7 +194,7 @@ export async function executeMiniApp(id: string, inputs: Record<string, any>, ap
   const res = await fetch(`${API_BASE}/apps/${id}/run`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ inputs, sessionId }),
+    body: JSON.stringify({ inputs, sessionId, app: appOverride }),
   });
   if (!res.ok) {
     const err = await res.json();
