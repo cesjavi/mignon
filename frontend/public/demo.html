@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Acme Portal - External Website Powered by Mignon AI Widgets</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: #030712;
+      color: #f3f4f6;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      padding: 0;
+      margin: 0;
+      line-height: 1.6;
+    }
+    nav {
+      height: 70px;
+      border-bottom: 1px solid #1f2937;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 40px;
+      background: rgba(17, 24, 39, 0.8);
+      backdrop-filter: blur(10px);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .logo {
+      font-weight: 800;
+      font-size: 1.25rem;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .logo span { color: #38bdf8; }
+    .hero {
+      max-width: 1100px;
+      margin: 60px auto 40px;
+      padding: 0 20px;
+      text-align: center;
+    }
+    .badge {
+      display: inline-block;
+      padding: 6px 14px;
+      background: rgba(56, 189, 248, 0.1);
+      color: #38bdf8;
+      border: 1px solid rgba(56, 189, 248, 0.2);
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+    h1 {
+      font-size: 3rem;
+      font-weight: 800;
+      line-height: 1.15;
+      margin-bottom: 16px;
+      background: linear-gradient(135deg, #ffffff 0%, #94a3b8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    p.subtitle {
+      font-size: 1.1rem;
+      color: #9ca3af;
+      max-width: 700px;
+      margin: 0 auto 40px;
+    }
+    .widgets-grid {
+      max-width: 1100px;
+      margin: 40px auto 80px;
+      padding: 0 20px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 32px;
+    }
+    @media (max-width: 768px) {
+      .widgets-grid { grid-template-columns: 1fr; }
+      h1 { font-size: 2.2rem; }
+    }
+    .widget-container-card {
+      background: #0f172a;
+      border: 1px solid #1e293b;
+      border-radius: 20px;
+      padding: 24px;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+    }
+    .widget-header {
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #1e293b;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .widget-title { font-weight: 700; font-size: 0.95rem; color: #e2e8f0; }
+    .code-tag { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: #38bdf8; background: #0284c715; padding: 2px 6px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <div class="logo">
+      <span>🌐</span> Acme Travel & Global Operations Portal
+    </div>
+    <div>
+      <a href="/" style="color: #38bdf8; text-decoration: none; font-size: 0.85rem; font-weight: 600;">← Back to Mignon Studio</a>
+    </div>
+  </nav>
+
+  <div class="hero">
+    <div class="badge">🚀 Embedded AI Mini-App Demo</div>
+    <h1>Supercharge Any Web App with Gemini Micro-Agents</h1>
+    <p class="subtitle">
+      This sample client website embeds autonomous Mini-Apps directly from Mignon via simple <code>&lt;script&gt;</code> tags.
+    </p>
+  </div>
+
+  <div class="widgets-grid">
+    <!-- Embedded Flight Scout Widget -->
+    <div class="widget-container-card">
+      <div class="widget-header">
+        <span class="widget-title">✈️ Embedded Travel Scout</span>
+        <span class="code-tag">&lt;div data-mignon-app="app_flight_scout"&gt;</span>
+      </div>
+      <div data-mignon-app="app_flight_scout" data-theme="dark"></div>
+    </div>
+
+    <!-- Embedded World Clock Widget -->
+    <div class="widget-container-card">
+      <div class="widget-header">
+        <span class="widget-title">🌍 Embedded Global Sync</span>
+        <span class="code-tag">&lt;div data-mignon-app="app_world_clock"&gt;</span>
+      </div>
+      <div data-mignon-app="app_world_clock" data-theme="dark"></div>
+    </div>
+  </div>
+
+  <!-- Load the Mignon Standalone Widget Script (also enables the floating assistant bubble) -->
+  <script src="/widget.js" data-app-id="app_lead_qualifier" data-mode="floating" async></script>
+</body>
+</html>
