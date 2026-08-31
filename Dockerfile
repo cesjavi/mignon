@@ -3,12 +3,11 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Build Widget & Frontend
+# Build Frontend
 COPY frontend/package*.json ./frontend/
 RUN cd frontend && npm install
 
 COPY frontend ./frontend
-COPY widget/dist/widget.js ./frontend/public/widget.js
 RUN cd frontend && npm run build
 
 # Production Server Container
@@ -20,7 +19,8 @@ RUN cd backend && npm install --production
 
 COPY backend ./backend
 COPY --from=builder /app/frontend/dist ./frontend/dist
-COPY widget/dist/widget.js ./widget/dist/widget.js
+COPY --from=builder /app/frontend/public/widget.js ./widget/dist/widget.js
+COPY --from=builder /app/frontend/public/demo.html ./frontend/public/demo.html
 
 ENV NODE_ENV=production
 ENV PORT=8080
