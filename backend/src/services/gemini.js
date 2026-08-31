@@ -103,7 +103,8 @@ async function executeGeminiLive({ model, systemInstruction, prompt, allowedTool
       "Content-Type": "application/json",
       "x-goog-api-key": GEMINI_API_KEY
     },
-    body: JSON.stringify(requestBody)
+    body: JSON.stringify(requestBody),
+    signal: AbortSignal.timeout(9000)
   });
 
   if (!res.ok) {
@@ -144,7 +145,8 @@ async function executeGeminiLive({ model, systemInstruction, prompt, allowedTool
           }
         ],
         systemInstruction: systemInstruction ? { parts: [{ text: systemInstruction }] } : undefined
-      })
+      }),
+      signal: AbortSignal.timeout(9000)
     });
 
     if (toolFollowUpRes.ok) {
@@ -204,7 +206,8 @@ Return ONLY valid JSON without markdown wrapping:
           contents: [{ parts: [{ text: `Create a comprehensive Mini-App for this idea: "${userIdea}"` }] }],
           systemInstruction: { parts: [{ text: systemPrompt }] },
           generationConfig: { temperature: 0.2 }
-        })
+        }),
+        signal: AbortSignal.timeout(9000)
       });
 
       if (res.ok) {

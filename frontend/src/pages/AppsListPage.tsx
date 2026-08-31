@@ -22,6 +22,7 @@ export const AppsListPage: React.FC = () => {
   const [testingAppId, setTestingAppId] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<any>(null);
   const [isExecuting, setIsExecuting] = useState(false);
+  const [executionElapsed, setExecutionElapsed] = useState(0);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // Prompt-to-App AI Modal
@@ -32,6 +33,17 @@ export const AppsListPage: React.FC = () => {
   useEffect(() => {
     loadApps();
   }, []);
+
+  useEffect(() => {
+    let interval: any;
+    if (isExecuting) {
+      setExecutionElapsed(0);
+      interval = setInterval(() => {
+        setExecutionElapsed((prev) => +(prev + 0.2).toFixed(1));
+      }, 200);
+    }
+    return () => clearInterval(interval);
+  }, [isExecuting]);
 
   async function loadApps() {
     try {
@@ -59,7 +71,7 @@ export const AppsListPage: React.FC = () => {
       const res = await executeMiniApp(app.id, defaultInputs);
       setTestResult(res);
     } catch (err: any) {
-      setTestResult({ error: err.message });
+      setTestResult({ error: err.message || 'Execution failed' });
     } finally {
       setIsExecuting(false);
     }
@@ -391,23 +403,87 @@ export const AppsListPage: React.FC = () => {
             </div>
 
             {isExecuting ? (
-              <div className="py-12 flex flex-col items-center justify-center space-y-4">
-                <div className="w-10 h-10 border-4 border-sky-500/20 border-t-sky-400 rounded-full animate-spin"></div>
-                <p className="text-sm font-medium text-slate-300">
-                  Invoking Gemini Flash Agent & Running Tools...
+              <div className="py-10 flex flex-col items-center justify-center space-y-4 text-center">
+                <div className="relative">
+                  <div className="w-14 h-14 border-4 border-sky-500/20 border-t-sky-400 rounded-full animate-spin"></div>
+                  <div className="absolute inset-0 flex items-center justify-center text-[11px] font-mono text-sky-400 font-bold">
+                    {executionElapsed}s
+                  </div>
+                </div>
+
+                <div className="space-y-1 max-w-sm">
+                  <p className="text-sm font-semibold text-white">
+                    {executionElapsed < 1.5
+                      ? '1/3 Initializing Gemini Agent & Tool Bindings...'
+                      : executionElapsed < 3.5
+                      ? '2/3 Executing Native Function Calling Tool Loop...'
+                      : '3/3 Synthesizing Final Reasoning & Structured Output...'}
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    Live reasoning pipeline running on Google Gemini 3.5 Flash
+                  </p>
+                </div>
+
+                {/* Micro Progress Bar */}
+                <div className="w-64 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-sky-400 to-indigo-500 transition-all duration-300 rounded-full"
+                    style={{
+                      width: `${Math.min(95, Math.max(15, executionElapsed * 28))}%`,
+                    }}
+                  ></div>
+                </div>
+              </div>
+            ) : testResult?.error ? (
+              <div className="p-5 rounded-xl bg-rose-950/40 border border-rose-800/60 space-y-3">
+                <div className="flex items-center gap-2 text-rose-400 font-semibold text-sm">
+                  <span>⚠️ Notice / Execution Info:</span>
+                </div>
+                <p className="text-xs text-rose-200 leading-relaxed">
+                  {testResult.error}
                 </p>
+                <div className="pt-2">
+                  <button
+                    onClick={() => {
+                      const app = apps.find((a) => a.id === testingAppId);
+                      if (app) handleQuickRun(app);
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold transition-colors"
+                  >
+                    Retry Execution
+                  </button>
+                </div>
               </div>
             ) : testResult ? (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-400">Agent Reasoning Output</span>
-                  <button
-                    onClick={() => handleSpeakText(testResult.result?.markdown || '')}
-                    className="flex items-center gap-1.5 text-xs text-sky-400 bg-sky-950/60 px-2.5 py-1 rounded-lg border border-sky-800/40 hover:bg-sky-900/60"
-                  >
-                    <Volume2 size={13} />
-                    <span>Listen Voice</span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-slate-400">Agent Reasoning Output</span>
+                    {testResult.result?.tool_executed && (
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-950/70 text-indigo-300 border border-indigo-800/50">
+                        Tool: {testResult.result.tool_executed}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        const app = apps.find((a) => a.id === testingAppId);
+                        if (app) handleQuickRun(app);
+                      }}
+                      className="text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded-lg transition-colors"
+                      title="Run again"
+                    >
+                      Re-run
+                    </button>
+                    <button
+                      onClick={() => handleSpeakText(testResult.result?.markdown || '')}
+                      className="flex items-center gap-1.5 text-xs text-sky-400 bg-sky-950/60 px-2.5 py-1 rounded-lg border border-sky-800/40 hover:bg-sky-900/60"
+                    >
+                      <Volume2 size={13} />
+                      <span>Listen Voice</span>
+                    </button>
+                  </div>
                 </div>
 
                 <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 font-sans text-sm text-slate-200 whitespace-pre-wrap leading-relaxed max-h-72 overflow-y-auto">
