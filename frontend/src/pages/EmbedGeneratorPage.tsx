@@ -13,7 +13,7 @@ export const EmbedGeneratorPage: React.FC = () => {
   const [apps, setApps] = useState<MiniApp[]>([]);
   const [selectedAppId, setSelectedAppId] = useState<string>(initialAppId || '');
   const [embedMode, setEmbedMode] = useState<'inline' | 'floating' | 'iframe' | 'react'>('inline');
-  const [displayMode, setDisplayMode] = useState<'form' | 'direct'>('form');
+  const [displayMode, setDisplayMode] = useState<'form' | 'direct' | 'result_only'>('form');
   const [copied, setCopied] = useState(false);
   const [themeMode, setThemeMode] = useState<'dark' | 'light'>('dark');
 
@@ -155,32 +155,47 @@ export const EmbedGeneratorPage: React.FC = () => {
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
                 3. Presentation Mode
               </label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <button
                   type="button"
                   onClick={() => setDisplayMode('form')}
-                  className={`p-2.5 rounded-xl border text-xs font-semibold transition-all ${
+                  className={`p-2 rounded-xl border text-xs font-semibold transition-all ${
                     displayMode === 'form'
                       ? 'bg-sky-500/15 border-sky-500/40 text-sky-300'
                       : 'bg-slate-950/40 border-slate-800 text-slate-400 hover:border-slate-700'
                   }`}
                 >
-                  Interactive Form
+                  Form Mode
                 </button>
                 <button
                   type="button"
                   onClick={() => setDisplayMode('direct')}
-                  className={`p-2.5 rounded-xl border text-xs font-semibold transition-all ${
+                  className={`p-2 rounded-xl border text-xs font-semibold transition-all ${
                     displayMode === 'direct'
-                      ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
+                      ? 'bg-sky-500/15 border-sky-500/40 text-sky-300'
                       : 'bg-slate-950/40 border-slate-800 text-slate-400 hover:border-slate-700'
                   }`}
                 >
-                  Direct Auto-Display ✨
+                  Direct Card
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDisplayMode('result_only')}
+                  className={`p-2 rounded-xl border text-xs font-semibold transition-all ${
+                    displayMode === 'result_only'
+                      ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300 shadow-sm'
+                      : 'bg-slate-950/40 border-slate-800 text-slate-400 hover:border-slate-700'
+                  }`}
+                >
+                  Pure Result ✨
                 </button>
               </div>
               <p className="text-[11px] text-slate-500 mt-1.5">
-                {displayMode === 'direct' ? 'Auto-runs on page load and renders the quote / result directly.' : 'Renders inputs and an Execute button.'}
+                {displayMode === 'result_only' 
+                  ? 'Pure Minimalist Mode: Only the quote or output is rendered directly, with zero card headers or chrome.' 
+                  : displayMode === 'direct' 
+                  ? 'Direct Card: Shows card header, direct quote, next button and actions.' 
+                  : 'Form Mode: Asks for inputs and has an Execute button.'}
               </p>
             </div>
 

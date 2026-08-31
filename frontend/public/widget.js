@@ -1,6 +1,6 @@
 /**
  * Mignon Web Widget (Standalone Embeddable AI Mini-App Engine)
- * Features: Instant Auto-Display Mode, Multi-turn Memory, Web Speech Voice & TTS, Dynamic UI Cards, Shadow DOM Isolation
+ * Features: Pure Result Only Mode, Instant Auto-Display, Interactive Form, Voice & TTS, Shadow DOM Isolation
  */
 (function () {
   const SCRIPT_TAG = document.currentScript;
@@ -109,35 +109,22 @@
     const shadow = targetEl.attachShadow ? targetEl.attachShadow({ mode: "open" }) : targetEl;
     const sessionId = `sess_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
 
-    shadow.innerHTML = `
-      <style>
-        .loader {
-          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-          padding: 24px;
-          background: #080c14;
-          color: #94a3b8;
-          border-radius: 18px;
-          border: 1px solid #1e293b;
-          text-align: center;
-          font-size: 13px;
-        }
-      </style>
-      <div class="loader">⚡ Loading AI Mini-App...</div>
-    `;
-
     const app = await fetchAppMetadata(apiUrl, appId);
     if (!app) {
-      shadow.innerHTML = `<div class="loader" style="color: #ef4444;">Unable to connect to Mini-App [${appId}]. Ensure backend is running.</div>`;
+      shadow.innerHTML = `<div style="font-family: sans-serif; color: #ef4444; padding: 12px; font-size: 13px;">Unable to load Mini-App [${appId}].</div>`;
       return;
     }
 
-    const isDirectDisplay = display === "direct" || app.theme?.displayMode === "direct";
-    renderAppWidget(shadow, app, apiUrl, sessionId, isDirectDisplay);
+    const effectiveMode = display || app.theme?.displayMode || "form";
+    renderAppWidget(shadow, app, apiUrl, sessionId, effectiveMode);
   }
 
-  function renderAppWidget(shadow, app, apiUrl, sessionId, isDirectDisplay) {
+  function renderAppWidget(shadow, app, apiUrl, sessionId, displayMode) {
     const primaryColor = app.theme?.primaryColor || "#38bdf8";
     const badgeText = app.theme?.badge || "AI Powered";
+    const isResultOnly = displayMode === "result_only" || displayMode === "minimal";
+    const isDirect = displayMode === "direct";
+    const isAutoRun = isResultOnly || isDirect;
 
     const defaultInputs = {};
     (app.inputs || []).forEach(inp => { defaultInputs[inp.id] = inp.default || ''; });
@@ -148,9 +135,7 @@
         return `
           <div class="form-group">
             <label class="form-label">${input.label}</label>
-            <select class="form-control" name="${input.id}">
-              ${options}
-            </select>
+            <select class="form-control" name="${input.id}">${options}</select>
           </div>
         `;
       }
@@ -177,7 +162,7 @@
     }).join("");
 
     const container = document.createElement("div");
-    container.className = "mignon-card";
+    container.className = isResultOnly ? "mignon-result-only" : "mignon-card";
     container.innerHTML = `
       <style>
         :host {
@@ -185,18 +170,35 @@
           font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        /* Standard Card */
         .mignon-card {
           background: #080c14;
           color: #f8fafc;
           border-radius: 18px;
           border: 1px solid #1e293b;
-          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.05);
+          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
           overflow: hidden;
           font-size: 14px;
           display: flex;
           flex-direction: column;
           max-width: 100%;
         }
+
+        /* Result Only / Pure Minimal View */
+        .mignon-result-only {
+          background: #040711;
+          color: #f8fafc;
+          border-radius: 14px;
+          border: 1px solid #1e293b;
+          padding: 16px;
+          font-size: 14px;
+          position: relative;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+
         .header {
           padding: 14px 18px;
           background: #0f172a;
@@ -204,7 +206,6 @@
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 10px;
         }
         .header-title-wrap { display: flex; align-items: center; gap: 8px; }
         .icon-box {
@@ -217,14 +218,12 @@
           justify-content: center;
           color: ${primaryColor};
           font-weight: bold;
-          font-size: 15px;
         }
         .title { font-size: 13.5px; font-weight: 700; color: #ffffff; }
         .badge {
           font-size: 10px;
           font-weight: 700;
           text-transform: uppercase;
-          letter-spacing: 0.5px;
           padding: 3px 8px;
           border-radius: 999px;
           background: rgba(56, 189, 248, 0.12);
@@ -245,11 +244,6 @@
           border-radius: 8px;
           font-size: 12.5px;
           outline: none;
-          transition: border-color 0.15s ease, box-shadow 0.15s ease;
-        }
-        .form-control:focus {
-          border-color: ${primaryColor};
-          box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
         }
         .voice-btn {
           background: #1e293b;
@@ -258,7 +252,6 @@
           padding: 6px 9px;
           border-radius: 8px;
           cursor: pointer;
-          font-size: 13px;
         }
         .btn-submit {
           background: linear-gradient(135deg, ${primaryColor} 0%, #4f46e5 100%);
@@ -274,104 +267,87 @@
           justify-content: center;
           gap: 6px;
         }
-        .btn-submit:hover { opacity: 0.94; }
         .result-box {
           padding: 14px;
           background: #040711;
           border: 1px solid #1e293b;
           border-radius: 12px;
-          display: ${isDirectDisplay ? 'block' : 'none'};
+          display: ${isAutoRun ? 'block' : 'none'};
         }
         .result-box.active { display: block; animation: fadeIn 0.2s ease-out; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        .result-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          border-bottom: 1px solid #1e293b;
-          padding-bottom: 8px;
-          margin-bottom: 10px;
-        }
+        
         .result-text {
-          font-size: 13px;
+          font-size: 13.5px;
           line-height: 1.55;
           color: #e2e8f0;
           white-space: pre-wrap;
           font-family: ${app.slug?.includes("fortune") ? "'JetBrains Mono', monospace" : "inherit"};
         }
-        .tts-btn, .refresh-btn {
-          background: rgba(56, 189, 248, 0.1);
-          border: 1px solid rgba(56, 189, 248, 0.25);
-          color: ${primaryColor};
-          font-size: 11px;
-          font-weight: 600;
-          padding: 4px 8px;
-          border-radius: 6px;
-          cursor: pointer;
-          display: inline-flex;
-          align-items: center;
-          gap: 4px;
-        }
-        .action-bar {
+        
+        .result-only-bar {
           display: flex;
-          gap: 8px;
-          margin-top: 10px;
-          padding-top: 8px;
-          border-top: 1px solid #1e293b;
+          justify-content: flex-end;
+          gap: 6px;
+          margin-top: 8px;
         }
-        .act-btn {
-          flex: 1;
+        
+        .mini-btn {
           background: #1e293b;
           border: 1px solid #334155;
-          color: #e2e8f0;
+          color: #cbd5e1;
           font-size: 11px;
-          font-weight: 600;
-          padding: 6px 10px;
+          padding: 3px 7px;
           border-radius: 6px;
           cursor: pointer;
-          text-align: center;
         }
+        .mini-btn:hover { background: #334155; color: #fff; }
       </style>
 
-      <div class="header">
-        <div class="header-title-wrap">
-          <div class="icon-box">⚡</div>
-          <div class="title">${app.name}</div>
+      ${isResultOnly ? `
+        <!-- Pure Result Only View -->
+        <div class="result-text" id="result-content">Loading...</div>
+        <div id="dynamic-cards"></div>
+        <div class="result-only-bar">
+          <button class="mini-btn" id="refresh-btn" title="Refresh Output">🔄</button>
+          <button class="mini-btn" id="tts-btn" title="Listen">🔊</button>
+          <button class="mini-btn" id="copy-btn" title="Copy">📋</button>
         </div>
-        <span class="badge">${badgeText}</span>
-      </div>
+      ` : `
+        <!-- Standard Card View -->
+        <div class="header">
+          <div class="header-title-wrap">
+            <div class="icon-box">⚡</div>
+            <div class="title">${app.name}</div>
+          </div>
+          <span class="badge">${badgeText}</span>
+        </div>
 
-      <div class="body">
-        ${!isDirectDisplay ? `<p class="desc">${app.description || ''}</p>` : ''}
-        
-        <form id="widget-form" style="display: ${isDirectDisplay ? 'none' : 'flex'}; flex-direction: column; gap: 12px;">
-          ${inputsHtml}
+        <div class="body">
+          ${!isDirect ? `<p class="desc">${app.description || ''}</p>` : ''}
           
-          <button type="submit" class="btn-submit" id="submit-btn">
-            <span>Execute with Gemini Agent</span>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-          </button>
-        </form>
+          <form id="widget-form" style="display: ${isDirect ? 'none' : 'flex'}; flex-direction: column; gap: 12px;">
+            ${inputsHtml}
+            <button type="submit" class="btn-submit" id="submit-btn">
+              <span>Execute with Gemini Agent</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </button>
+          </form>
 
-        <div class="result-box ${isDirectDisplay ? 'active' : ''}" id="result-container">
-          <div class="result-header">
-            <span style="font-size: 11px; font-weight: 700; color: #38bdf8;">
-              ${isDirectDisplay ? '🌟 Daily Quote / Fortune' : '⚡ Gemini Output'}
-            </span>
-            <div style="display: flex; gap: 6px;">
-              ${isDirectDisplay ? `<button class="refresh-btn" id="refresh-quote-btn">🔄 Next Quote</button>` : ''}
-              <button class="tts-btn" id="tts-btn">🔊 Listen</button>
+          <div class="result-box ${isDirect ? 'active' : ''}" id="result-container">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px solid #1e293b; padding-bottom: 6px;">
+              <span style="font-size: 11px; font-weight: 700; color: #38bdf8;">${isDirect ? '🌟 Quote / Result' : '⚡ Gemini Output'}</span>
+              <div style="display: flex; gap: 6px;">
+                ${isDirect ? `<button class="mini-btn" id="refresh-btn">🔄 Next</button>` : ''}
+                <button class="mini-btn" id="tts-btn">🔊 Listen</button>
+                <button class="mini-btn" id="copy-btn">📋 Copy</button>
+              </div>
             </div>
-          </div>
-          <div class="result-text" id="result-content">Loading quote directly...</div>
-          <div id="dynamic-cards" style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;"></div>
-          
-          <div class="action-bar">
-            <button class="act-btn" id="copy-btn">📋 Copy</button>
-            <button class="act-btn" id="share-btn">🔗 Share</button>
+            <div class="result-text" id="result-content">Loading...</div>
+            <div id="dynamic-cards" style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;"></div>
           </div>
         </div>
-      </div>
+      `}
     `;
 
     shadow.innerHTML = "";
@@ -383,14 +359,14 @@
     const resultContent = shadow.getElementById("result-content");
     const ttsBtn = shadow.getElementById("tts-btn");
     const copyBtn = shadow.getElementById("copy-btn");
-    const refreshBtn = shadow.getElementById("refresh-quote-btn");
+    const refreshBtn = shadow.getElementById("refresh-btn");
 
     async function executeApp(inputPayload) {
       if (submitBtn) {
         submitBtn.disabled = true;
         submitBtn.innerHTML = `<span>Executing Agent...</span>`;
       }
-      resultContent.innerText = "Generating with Gemini Agent...";
+      resultContent.innerText = "Generating...";
 
       try {
         const res = await fetch(`${apiUrl}/api/v1/apps/${app.id}/run`, {
@@ -402,10 +378,10 @@
         if (!res.ok) throw new Error("Execution returned an error");
         const data = await res.json();
         resultContent.innerText = data.result?.markdown || "Execution complete.";
-        resultBox.classList.add("active");
+        if (resultBox) resultBox.classList.add("active");
       } catch (err) {
         resultContent.innerText = `⚠️ Error: ${err.message}`;
-        resultBox.classList.add("active");
+        if (resultBox) resultBox.classList.add("active");
       } finally {
         if (submitBtn) {
           submitBtn.disabled = false;
@@ -414,8 +390,8 @@
       }
     }
 
-    // If direct display mode, auto-execute immediately upon loading!
-    if (isDirectDisplay) {
+    // Auto-run if direct or result_only
+    if (isAutoRun) {
       executeApp(defaultInputs);
     }
 
@@ -425,29 +401,33 @@
       });
     }
 
-    // Form submit
-    form.addEventListener("submit", (e) => {
-      e.preventDefault();
-      const formData = new FormData(form);
-      const inputs = {};
-      formData.forEach((val, key) => { inputs[key] = val; });
-      executeApp(inputs);
-    });
+    if (form) {
+      form.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const formData = new FormData(form);
+        const inputs = {};
+        formData.forEach((val, key) => { inputs[key] = val; });
+        executeApp(inputs);
+      });
+    }
 
-    // TTS & Copy
-    ttsBtn.addEventListener("click", () => {
-      const textToSpeak = resultContent.innerText;
-      if (!textToSpeak) return;
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(textToSpeak);
-      window.speechSynthesis.speak(utterance);
-    });
+    if (ttsBtn) {
+      ttsBtn.addEventListener("click", () => {
+        const textToSpeak = resultContent.innerText;
+        if (!textToSpeak) return;
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(textToSpeak);
+        window.speechSynthesis.speak(utterance);
+      });
+    }
 
-    copyBtn.addEventListener("click", () => {
-      navigator.clipboard.writeText(resultContent.innerText);
-      copyBtn.innerText = "✓ Copied!";
-      setTimeout(() => { copyBtn.innerText = "📋 Copy"; }, 2000);
-    });
+    if (copyBtn) {
+      copyBtn.addEventListener("click", () => {
+        navigator.clipboard.writeText(resultContent.innerText);
+        copyBtn.innerText = "✓";
+        setTimeout(() => { copyBtn.innerText = "📋"; }, 2000);
+      });
+    }
   }
 
   if (document.readyState === "loading") {

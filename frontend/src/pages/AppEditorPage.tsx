@@ -35,7 +35,7 @@ export const AppEditorPage: React.FC = () => {
   const [primaryColor, setPrimaryColor] = useState('#38bdf8');
   const [badge, setBadge] = useState('AI Mini-App');
   const [widgetLayout, setWidgetLayout] = useState<'card' | 'floating'>('card');
-  const [displayMode, setDisplayMode] = useState<'form' | 'direct'>('form');
+  const [displayMode, setDisplayMode] = useState<'form' | 'direct' | 'result_only'>('form');
   const [webhookUrl, setWebhookUrl] = useState('');
 
   // Simulator State
@@ -505,7 +505,8 @@ export const AppEditorPage: React.FC = () => {
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
                 >
                   <option value="form">Interactive Form (Ask inputs & click Run)</option>
-                  <option value="direct">Direct Auto-Display (Show quote/result directly)</option>
+                  <option value="direct">Direct Card (Header + Quote + Actions)</option>
+                  <option value="result_only">Pure Result Only (Only the Quote, Minimalist ✨)</option>
                 </select>
               </div>
             </div>
