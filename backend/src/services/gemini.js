@@ -2,7 +2,7 @@ import { executeTool, TOOLS_SCHEMA } from "../tools/index.js";
 import { store } from "./store.js";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.6-flash";
 
 export async function runAgentWithTools({ app, userQuery, inputValues = {}, sessionId = null }) {
   const startTime = Date.now();
@@ -19,7 +19,7 @@ export async function runAgentWithTools({ app, userQuery, inputValues = {}, sess
   const history = sessionId ? store.getSessionHistory(sessionId) : [];
 
   // Check if we can run via official Google Gemini endpoint
-  if (GEMINI_API_KEY && GEMINI_API_KEY.startsWith("AIzaSy")) {
+  if (GEMINI_API_KEY && GEMINI_API_KEY.length > 10) {
     try {
       const response = await executeGeminiLive({
         model: GEMINI_MODEL,
@@ -68,7 +68,7 @@ export async function runAgentWithTools({ app, userQuery, inputValues = {}, sess
 // Google Gemini API live execution with tool function declarations
 async function executeGeminiLive({ model, systemInstruction, prompt, allowedTools = [], history = [] }) {
   const selectedToolsSchema = TOOLS_SCHEMA.filter(t => allowedTools.includes(t.name));
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`;
 
   const contents = [
     ...history,
@@ -99,7 +99,10 @@ async function executeGeminiLive({ model, systemInstruction, prompt, allowedTool
 
   const res = await fetch(endpoint, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "x-goog-api-key": GEMINI_API_KEY
+    },
     body: JSON.stringify(requestBody)
   });
 
@@ -120,7 +123,10 @@ async function executeGeminiLive({ model, systemInstruction, prompt, allowedTool
 
     const toolFollowUpRes = await fetch(endpoint, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": GEMINI_API_KEY
+      },
       body: JSON.stringify({
         contents: [
           ...contents,
@@ -162,9 +168,9 @@ async function executeGeminiLive({ model, systemInstruction, prompt, allowedTool
 
 // "Prompt-to-App" synthesis engine
 export async function generateMiniAppWithGemini({ userIdea }) {
-  if (GEMINI_API_KEY && GEMINI_API_KEY.startsWith("AIzaSy")) {
+  if (GEMINI_API_KEY && GEMINI_API_KEY.length > 10) {
     try {
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`;
       
       const systemPrompt = `You are the Mignon Architect Agent. You design autonomous AI Mini-Apps based on user requirements.
 Return ONLY valid JSON without markdown wrapping:
@@ -190,7 +196,10 @@ Return ONLY valid JSON without markdown wrapping:
 
       const res = await fetch(endpoint, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": GEMINI_API_KEY
+        },
         body: JSON.stringify({
           contents: [{ parts: [{ text: `Create a comprehensive Mini-App for this idea: "${userIdea}"` }] }],
           systemInstruction: { parts: [{ text: systemPrompt }] },
